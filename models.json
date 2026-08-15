@@ -1,0 +1,10 @@
+{
+  "_comment": "Canonical model registry — the verified list of model ids. Runs reference these ids, so names can't collide or duplicate. Add new configs here; run `npm run db:init` to sync into the DB.",
+  "models": [
+    { "id": "qwen-gemini",  "name": "Qwen+Gemini",  "notes": "Qwen OCR + Gemini reasoning" },
+    { "id": "qwen-gemma",   "name": "Qwen+Gemma",   "notes": "Qwen OCR + Gemma reasoning" },
+    { "id": "gemma-only",   "name": "Gemma-only",   "notes": "" },
+    { "id": "gemini-only",  "name": "Gemini-only",  "notes": "" },
+    { "id": "chandra-only", "name": "Chandra-only", "notes": "Chandra OCR (CPT base)" }
+  ]
+}

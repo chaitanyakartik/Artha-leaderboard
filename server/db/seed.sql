@@ -6,9 +6,4 @@ INSERT OR IGNORE INTO tasks (slug, label, sort_order) VALUES
   ('extraction',     'Extraction',     3),
   ('segregation',    'Segregation',    4);
 
-INSERT OR IGNORE INTO model_configs (name) VALUES
-  ('Qwen+Gemini'),
-  ('Qwen+Gemma'),
-  ('Gemma-only'),
-  ('Gemini-only'),
-  ('Chandra-only');
+-- model_configs are seeded from /models.json by init.js (the verified registry), not here.

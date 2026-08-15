@@ -18,9 +18,11 @@ CREATE TABLE IF NOT EXISTS datasets (
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Canonical model registry. Seeded from /models.json (the verified list of model ids in
+-- the repo root). `id` is a stable slug; runs reference it, so names can't collide or dupe.
 CREATE TABLE IF NOT EXISTS model_configs (
-  id     INTEGER PRIMARY KEY AUTOINCREMENT,
-  name   TEXT NOT NULL UNIQUE,               -- Qwen+Gemini, Chandra-only, ...
+  id     TEXT PRIMARY KEY,                   -- stable id from models.json, e.g. "qwen-gemini"
+  name   TEXT NOT NULL UNIQUE,               -- display name, e.g. "Qwen+Gemini"
   notes  TEXT
 );
 
@@ -67,7 +69,7 @@ CREATE TABLE IF NOT EXISTS runs (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   task                  TEXT NOT NULL REFERENCES tasks(slug),
   dataset_id            INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
-  model_config_id       INTEGER NOT NULL REFERENCES model_configs(id),
+  model_config_id       TEXT NOT NULL REFERENCES model_configs(id),
   extraction_type_id    INTEGER REFERENCES extraction_types(id),      -- extraction only
   classifier_profile_id INTEGER REFERENCES classifier_profiles(id),   -- classification only
   predictions_path      TEXT,                -- stored upload; NULL for manual-entry rows

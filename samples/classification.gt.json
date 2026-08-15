@@ -1,0 +1,14 @@
+{
+  "gt": {
+    "appl1_doc01": "aadhaar",
+    "appl1_doc02": "pan",
+    "appl1_doc03": "bank_statement",
+    "appl1_doc04": "salary_slip",
+    "appl2_doc01": "aadhaar",
+    "appl2_doc02": "passport",
+    "appl2_doc03": "bank_statement"
+  },
+  "source_refs": {
+    "appl1_doc01": "s3://artha-val/v1/appl1/doc01.pdf"
+  }
+}
