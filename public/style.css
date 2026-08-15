@@ -43,3 +43,22 @@ code { background:#0b0d11; padding:1px 5px; border-radius:4px; font-size:12px; }
 .login-card button { padding:10px; font-size:15px; margin-top:4px; }
 .login-err { color:var(--bad); font-size:13px; min-height:16px; }
 #logout { margin-left:8px; }
+
+/* run drill-down */
+button.expand { background:none; border:none; color:var(--fg); padding:0; font:inherit; cursor:pointer; }
+button.expand:hover { color:var(--acc); }
+tr.detail:hover td { background:transparent; }
+tr.detail td { padding:0; border-bottom:1px solid var(--line); white-space:normal; }
+.drawer { padding:14px 16px; background:#0b0d11; font-size:13px; }
+.drawer.err { color:var(--bad); }
+.drawer .stats { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:12px; }
+.drawer .stats span { color:var(--mut); }
+.drawer .stats b { color:var(--fg); font-variant-numeric:tabular-nums; }
+.drawer .stats .bad b { color:var(--bad); }
+.misses-grid { display:flex; flex-wrap:wrap; gap:18px; }
+.misses { min-width:280px; flex:1; margin-bottom:10px; }
+.misses h4 { margin:0 0 6px; font-size:12px; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
+.misses table { min-width:0; }
+.misses th, .misses td { padding:5px 8px; white-space:normal; }
+.muted { color:var(--mut); }
+.muted code { background:#171a21; }

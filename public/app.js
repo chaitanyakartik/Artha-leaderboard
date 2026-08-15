@@ -169,16 +169,84 @@ function renderBoard(runs) {
   }
   const metricKeys = [...new Set(runs.flatMap((r) => Object.keys(r.metrics)))].sort();
   thead.innerHTML = `<tr><th>Model config</th>${metricKeys.map((k) => `<th>${k}</th>`).join('')}<th>Coverage</th><th>When</th><th></th></tr>`;
+  const span = metricKeys.length + 4; // for the full-width detail row
   tbody.innerHTML = runs.map((r) => {
     const cells = metricKeys.map((k) => `<td class="num">${r.metrics[k] ?? '—'}</td>`).join('');
     const cov = `<span class="badge ${r.coverage_status}">${r.coverage_status}${r.coverage_missing ? ` −${r.coverage_missing}` : ''}</span>`;
     const when = (r.created_at || '').replace('T', ' ').slice(0, 16);
-    return `<tr><td>${r.model_name}</td>${cells}<td>${cov}</td><td class="num">${when}</td><td><button class="del" data-id="${r.id}">✕</button></td></tr>`;
+    const name = `<button class="expand" data-id="${r.id}" title="${r.display_name || ''}">▸ ${r.model_name}</button>`;
+    return `<tr data-row="${r.id}"><td>${name}</td>${cells}<td>${cov}</td><td class="num">${when}</td><td><button class="del" data-id="${r.id}">✕</button></td></tr>
+            <tr class="detail" id="detail-${r.id}" hidden><td colspan="${span}"></td></tr>`;
   }).join('');
   tbody.querySelectorAll('.del').forEach((b) => b.onclick = async () => {
     if (!confirm('Delete this run?')) return;
     await api(`/api/runs/${b.dataset.id}`, { method: 'DELETE' }); refresh();
   });
+  tbody.querySelectorAll('.expand').forEach((b) => b.onclick = () => toggleDetail(b));
+}
+
+// --- run drill-down: fetch full detail, render the "popular misses" analysis ---
+async function toggleDetail(btn) {
+  const id = btn.dataset.id;
+  const row = $(`#detail-${id}`);
+  const open = !row.hidden;
+  if (open) { row.hidden = true; btn.textContent = btn.textContent.replace('▾', '▸'); return; }
+  btn.textContent = btn.textContent.replace('▸', '▾');
+  row.hidden = false;
+  const cell = row.firstElementChild;
+  cell.innerHTML = '<div class="drawer">loading…</div>';
+  try {
+    const run = await api(`/api/runs/${id}`);
+    cell.innerHTML = `<div class="drawer">${renderDetail(run)}</div>`;
+  } catch (e) { cell.innerHTML = `<div class="drawer err">${e.message}</div>`; }
+}
+
+function pairTable(title, rows, kind) {
+  if (!rows || !rows.length) return '';
+  const verb = kind === 'merge' ? 'merged' : kind === 'split' ? 'split' : 'seen as';
+  const body = rows.slice(0, 20).map((p) => {
+    const b = (p.from_bucket || p.to_bucket) ? ` <span class="muted">[${p.from_bucket || '?'}→${p.to_bucket || '?'}]</span>` : '';
+    return `<tr><td><code>${p.from}</code> → <code>${p.to}</code>${b}</td><td class="num">${p.count}</td></tr>`;
+  }).join('');
+  return `<div class="misses"><h4>${title}</h4><table><thead><tr><th>${verb} (class → class)</th><th>count</th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function renderDetail(run) {
+  const a = run.analysis;
+  let html = '';
+  if (a) {
+    if (a.boundary) {
+      const bd = a.boundary;
+      html += `<div class="stats">
+        <span>recall <b>${bd.recall}</b></span><span>precision <b>${bd.precision}</b></span><span>F1 <b>${bd.f1}</b></span>
+        <span class="bad">missed (merges) <b>${bd.fn}</b></span><span class="bad">spurious (splits) <b>${bd.fp}</b></span>
+        ${a.class ? `<span>page-class acc <b>${a.class.page_accuracy}</b></span>` : ''}
+      </div>`;
+    }
+    const pm = a.popular_misses || {};
+    html += `<div class="misses-grid">
+      ${pairTable('Most-merged boundaries (missed starts)', pm.merges, 'merge')}
+      ${pairTable('Most-split boundaries (spurious starts)', pm.splits, 'split')}
+      ${pairTable('Class confusion (page level)', pm.class_confusion, 'confuse')}
+    </div>`;
+    if (pm.bucket_merges && pm.bucket_merges.length) {
+      const rows = pm.bucket_merges.slice(0, 20).map((p) => `<tr><td><code>${p.from}</code> → <code>${p.to}</code></td><td class="num">${p.count}</td></tr>`).join('');
+      html += `<div class="misses"><h4>Bucket-level merges</h4><table><thead><tr><th>bucket → bucket</th><th>count</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    } else if (a.buckets_mapped === false && (pm.merges || []).length) {
+      html += `<p class="muted">Bucket rollup unavailable — no class→bucket map yet (add <code>bucket</code> to the class taxonomy).</p>`;
+    }
+  }
+  // Per-doc offenders (works for any task with item results).
+  const bad = (run.items || []).filter((it) => it.correct === 0);
+  if (bad.length) {
+    const rows = bad.slice(0, 30).map((it) => {
+      let d = {}; try { d = JSON.parse(it.detail_json || '{}'); } catch {}
+      const extra = d.missed_pages ? `missed p${(d.missed_pages || []).join(', p') || '—'}${d.spurious_pages && d.spurious_pages.length ? `; extra p${d.spurious_pages.join(', p')}` : ''}` : '';
+      return `<tr><td><code>${it.doc_id}</code></td><td>${extra}</td></tr>`;
+    }).join('');
+    html += `<div class="misses"><h4>Docs with errors (${bad.length})</h4><table><tbody>${rows}</tbody></table></div>`;
+  }
+  return html || '<p class="muted">No detailed analysis for this run.</p>';
 }
 
 boot().catch((e) => msg('Failed to load: ' + e.message, 'err'));

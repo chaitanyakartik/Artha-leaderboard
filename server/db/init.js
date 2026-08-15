@@ -22,6 +22,8 @@ ensureCol('runs', 'display_name', 'TEXT');
 ensureCol('runs', 'origin', "TEXT NOT NULL DEFAULT 'ui'");
 ensureCol('runs', 'external_ref', 'TEXT');
 ensureCol('runs', 'gt_fingerprint', 'TEXT');
+ensureCol('runs', 'analysis_json', 'TEXT');
+ensureCol('class_taxonomy', 'bucket', 'TEXT');
 d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_external ON runs(origin, external_ref) WHERE external_ref IS NOT NULL`);
 
 // Sync model registry from the root models.json (the verified list of model ids + cards).

@@ -31,7 +31,7 @@ GT must be present here, or the run is rejected (422 + missing list) unless `ove
 |---|---|---|
 | **classification** | class code string, or `{ "class": "...", "confidence": 0.9 }` | label match (lowercase+trim, codes kept intact) |
 | **extraction** | `{ "<field>": <value>, ... }` | field-typed match (string/number/amount/date) |
-| **segmentation** | `[[start,end], ...]` or `[{ "start":n, "end":n }, ...]` (page ranges) | boundary **recall** (headline), F1, precision, exact-match |
+| **segmentation** | ordered page list: `[{ "page":n, "tag":"start"\|"continue", "class":"..." }, ...]` | boundary **recall** (headline), F1, precision, page-class acc + **popular-misses** analysis |
 | **segregation** | group id (applicant id) string/number | partition agreement — ARI + purity |
 
 ### Examples
@@ -44,10 +44,29 @@ Extraction GT / prediction:
 ```json
 { "d1": { "name": "Ravi Kumar", "dob": "1990-05-12", "amount": "12500" } }
 ```
-Segmentation GT / prediction (bundle split into page ranges):
+Segmentation GT / prediction — a bundle is a sequence of pages, each tagged `start`/`continue`
+with its document `class`. This is the grouped form of the per-page **JSONL** the pipeline emits
+(one row = one page); the app keys it by bundle id:
 ```json
-{ "bundle1": [[1,3],[4,4],[5,9]] }
+{
+  "bundle1": [
+    { "page": 1, "tag": "start",    "class": "aadhaar" },
+    { "page": 2, "tag": "continue", "class": "aadhaar" },
+    { "page": 3, "tag": "start",    "class": "pan" },
+    { "page": 4, "tag": "start",    "class": "bank_statement" }
+  ]
+}
 ```
+- A **boundary** is a `start` after the first page (an internal cut). The first page is always a start.
+- Tag aliases accepted: `boundary`; values `s`/`c`, `begin`, `true`/`false`. Class aliases: `doc_type`,
+  `doc_class`, `category`. Missing tag ⇒ treated as `continue`.
+- **Metrics:** boundary **recall** is the headline (a missed start silently merges two docs — the
+  costly error), plus precision/F1, `missed_boundaries`, `spurious_boundaries`, `page_class_accuracy`,
+  `exact_match`.
+- **Detailed analysis** (per run, shown as the row drop-down): the *popular misses* — which
+  `class → class` boundaries get **merged** (missed) or **split** (spurious) most often, page-level
+  class confusion, and a `bucket → bucket` rollup (KYC / PKYC / ITR / financial / property / rental /
+  … — populated once the class taxonomy's `bucket` column is filled; empty until then).
 Segregation GT / prediction (each doc -> its applicant):
 ```json
 { "doc_a": "appl1", "doc_b": "appl1", "doc_c": "appl2" }

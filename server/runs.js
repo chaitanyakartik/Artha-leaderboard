@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { UPLOAD_DIR } from './db.js';
 import { scoreTask, checkCoverage } from './scoring/index.js';
+import { normalizeLabel } from './scoring/util.js';
 import { semanticName, makeRunKey } from './naming.js';
 
 // Stable hash of a GT set (sorted doc_ids + gold). Lets auto-ingest assert "the GT matches"
@@ -32,6 +33,12 @@ function scoringOpts(d, task, { profileId, extractionTypeId }) {
     const et = d.prepare('SELECT field_schema FROM extraction_types WHERE id = ?').get(extractionTypeId);
     if (et?.field_schema) opts.fieldSchema = JSON.parse(et.field_schema);
   }
+  if (task === 'segmentation') {
+    // class -> bucket map for the bucket-level "popular misses". Empty until the taxonomy's
+    // `bucket` column is populated (schema pending); keys normalized to match the scorer.
+    const rows = d.prepare('SELECT code, bucket FROM class_taxonomy WHERE bucket IS NOT NULL').all();
+    if (rows.length) opts.classBuckets = Object.fromEntries(rows.map((r) => [normalizeLabel(r.code), r.bucket]));
+  }
   return opts;
 }
 
@@ -44,11 +51,11 @@ function insertRunRow(d, base, fields) {
         `INSERT INTO runs (run_key, display_name, task, dataset_id, model_config_id,
                            extraction_type_id, classifier_profile_id, predictions_path,
                            coverage_status, coverage_missing, source, origin, external_ref,
-                           gt_fingerprint, notes)
+                           gt_fingerprint, analysis_json, notes)
          VALUES (@run_key, @display_name, @task, @dataset_id, @model_config_id,
                  @extraction_type_id, @classifier_profile_id, @predictions_path,
                  @coverage_status, @coverage_missing, @source, @origin, @external_ref,
-                 @gt_fingerprint, @notes)`
+                 @gt_fingerprint, @analysis_json, @notes)`
       ).run({ run_key, ...fields });
       return { run_id: info.lastInsertRowid, run_key };
     } catch (e) {
@@ -89,7 +96,8 @@ export function createRun(d, params) {
         display_name: base, task, dataset_id: datasetId, model_config_id: modelId,
         extraction_type_id: extractionTypeId, classifier_profile_id: profileId,
         predictions_path: null, coverage_status: 'manual', coverage_missing: 0,
-        source: 'manual', origin, external_ref: externalRef, gt_fingerprint: null, notes,
+        source: 'manual', origin, external_ref: externalRef, gt_fingerprint: null,
+        analysis_json: null, notes,
       });
       const mStmt = d.prepare('INSERT INTO run_metrics (run_id, key, value, scope) VALUES (?, ?, ?, ?)');
       for (const [k, v] of Object.entries(manualMetrics)) mStmt.run(run_id, k, Number(v), 'overall');
@@ -121,7 +129,8 @@ export function createRun(d, params) {
       extraction_type_id: extractionTypeId, classifier_profile_id: profileId,
       predictions_path: null, coverage_status: cov.full ? 'full' : 'partial',
       coverage_missing: cov.missing.length, source: 'upload', origin, external_ref: externalRef,
-      gt_fingerprint: gtFingerprint(gt), notes,
+      gt_fingerprint: gtFingerprint(gt),
+      analysis_json: result.analysis ? JSON.stringify(result.analysis) : null, notes,
     });
     const predPath = path.join(UPLOAD_DIR, `run-${run_id}.json`);
     fs.writeFileSync(predPath, JSON.stringify(predictions));
@@ -138,6 +147,6 @@ export function createRun(d, params) {
   return {
     ok: true, run_id, display_name: base,
     coverage: cov.full ? 'full' : 'partial', missing_count: cov.missing.length,
-    headline: result.headline, metrics: result.metrics,
+    headline: result.headline, metrics: result.metrics, analysis: result.analysis || null,
   };
 }

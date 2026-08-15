@@ -177,6 +177,8 @@ app.get('/api/runs/:id', async (req, reply) => {
   const id = Number(req.params.id);
   const run = d.prepare('SELECT r.*, m.name AS model_name FROM runs r JOIN model_configs m ON m.id = r.model_config_id WHERE r.id = ?').get(id);
   if (!run) return reply.code(404).send({ error: 'not found' });
+  if (run.analysis_json) run.analysis = JSON.parse(run.analysis_json);
+  delete run.analysis_json;
   run.metrics = d.prepare('SELECT key, value, scope FROM run_metrics WHERE run_id = ?').all(id);
   run.items = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ? LIMIT 2000').all(id);
   return run;

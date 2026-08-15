@@ -27,10 +27,10 @@ echo "== coverage gate (missing c -> 422) =="
 post /api/runs '{"task":"classification","dataset_id":'"$DSID"',"model_config_id":"gemini-only","predictions":{"a":"aadhaar","b":"pan"}}' \
   | jq '"code="+d["error"]+" missing="+str(d["missing"])'
 
-echo "== segmentation, headline=recall, one missed boundary =="
-post "/api/datasets/$DSID/gt" '{"task":"segmentation","gt":{"bundle1":[[1,3],[4,6],[7,9]]}}' >/dev/null
-post /api/runs '{"task":"segmentation","dataset_id":'"$DSID"',"model_config_id":"gemini-only","predictions":{"bundle1":[[1,6],[7,9]]}}' \
-  | jq '"headline="+d["headline"]["key"]+"="+str(d["headline"]["value"])'
+echo "== segmentation (per-page start/continue+class), headline=recall, one missed boundary =="
+post "/api/datasets/$DSID/gt" '{"task":"segmentation","gt":{"bundleA":[{"page":1,"tag":"start","class":"aadhaar"},{"page":2,"tag":"continue","class":"aadhaar"},{"page":3,"tag":"start","class":"pan"},{"page":4,"tag":"start","class":"bank_statement"}]}}' >/dev/null
+SEG=$(post /api/runs '{"task":"segmentation","dataset_id":'"$DSID"',"model_config_id":"gemini-only","predictions":{"bundleA":[{"page":1,"tag":"start","class":"aadhaar"},{"page":2,"tag":"continue","class":"aadhaar"},{"page":3,"tag":"continue","class":"aadhaar"},{"page":4,"tag":"start","class":"bank_statement"}]}}')
+echo "$SEG" | python3 -c 'import sys,json;d=json.load(sys.stdin);print("  headline="+d["headline"]["key"]+"="+str(d["headline"]["value"]));m=d["analysis"]["popular_misses"]["merges"];print("  top merge:",m[0]["from"],"->",m[0]["to"],"x",m[0]["count"]) if m else print("  no merges")'
 
 echo "== W&B ingest gated OFF (expect 501) =="
 curl -s -b "$J" -o /dev/null -w "status=%{http_code}\n" -X POST "$B/api/ingest/wandb" -H 'content-type: application/json' -d '{}'

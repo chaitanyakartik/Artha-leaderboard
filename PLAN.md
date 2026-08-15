@@ -44,7 +44,7 @@ Two ways to add a row:
 |----------------|-------------------------------------|----------------------------|
 | classification | `doc_id -> predicted_class (+conf)` | `doc_id -> true_class`     |
 | extraction     | `doc_id -> {field: value}`          | `doc_id -> {field: value}` |
-| segmentation   | `doc_id -> [segment boundaries]`    | true boundaries            |
+| segmentation   | `bundle -> [{page,tag,class}]` per-page | same shape (start/continue+class) |
 | segregation    | `doc_id -> group/applicant_id`      | true grouping              |
 
 ## Scoring (metrics per task) — DRAFT, confirm seg/segregation semantics
@@ -53,7 +53,7 @@ Two ways to add a row:
 |----------------|----------------------------------------------------------------------------|
 | classification | accuracy, macro/micro-F1, per-class P/R/F1, confusion — scoped to subset   |
 | extraction     | field-typed match (normalize dates/amounts/names), per-field & per-doctype, overall "real accuracy" |
-| segmentation   | exact-boundary match rate, per-doc segment F1 / page-range IoU  (TBD)      |
+| segmentation   | boundary **recall** (headline), F1, precision, page-class acc + popular-misses (class→class merges/splits, bucket rollup) |
 | segregation    | grouping accuracy: Adjusted Rand / purity / exact-group-match   (TBD)      |
 
 ## Stack
@@ -76,8 +76,9 @@ Two ways to add a row:
 - **P5:** UI refinement with Impeccable.
 
 > Note: classification + extraction scorers landed together in P1 (not staged as originally
-> drafted below). Segmentation + segregation are implemented but their metric **semantics** are a
-> working assumption pending real data — see CLAUDE.md §1.
+> drafted below). **Segmentation format is now locked** (per-page `start`/`continue`+`class`, recall-first)
+> with a per-run **popular-misses** drill-down; only the `class→bucket` map is pending (scaffolded in
+> `class_taxonomy.bucket`). Segregation metrics remain a working assumption pending real data — see CLAUDE.md §1.
 
 ## Data model (SQLite)
 

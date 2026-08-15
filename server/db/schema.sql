@@ -31,7 +31,9 @@ CREATE TABLE IF NOT EXISTS model_configs (
 CREATE TABLE IF NOT EXISTS class_taxonomy (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
   code   TEXT NOT NULL UNIQUE,               -- stable class id used in prediction/GT files
-  label  TEXT NOT NULL
+  label  TEXT NOT NULL,
+  bucket TEXT                                -- coarse group: KYC | PKYC | ITR | financial | property | rental | ...
+                                             -- feeds segmentation's bucket-level "popular misses"; NULL until the schema lands
 );
 
 -- What a given classifier was trained for = a subset of the 140 classes.
@@ -82,6 +84,7 @@ CREATE TABLE IF NOT EXISTS runs (
   origin                TEXT NOT NULL DEFAULT 'ui',       -- ui | wandb | api (ingestion channel)
   external_ref          TEXT,                -- provenance + dedup for auto-ingest (e.g. wandb run path)
   gt_fingerprint        TEXT,                -- GT hash at scoring time (auto-ingest "GT matches" check)
+  analysis_json         TEXT,                -- rich per-run analysis (e.g. segmentation "popular misses"); drives the run drill-down
   notes                 TEXT,
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -1,0 +1,16 @@
+{
+  "predictions": {
+    "bundleA": [
+      { "page": 1, "tag": "start",    "class": "aadhaar" },
+      { "page": 2, "tag": "continue", "class": "aadhaar" },
+      { "page": 3, "tag": "continue", "class": "aadhaar" },
+      { "page": 4, "tag": "start",    "class": "bank_statement" },
+      { "page": 5, "tag": "continue", "class": "bank_statement" }
+    ],
+    "bundleB": [
+      { "page": 1, "tag": "start",    "class": "itr" },
+      { "page": 2, "tag": "continue", "class": "itr" },
+      { "page": 3, "tag": "start",    "class": "salary_slip" }
+    ]
+  }
+}

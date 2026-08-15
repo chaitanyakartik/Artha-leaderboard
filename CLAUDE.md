@@ -20,14 +20,16 @@ One place to answer *"which model config wins, on which task, on which dataset."
 | Coverage gate (GT-completeness before scoring) | ✅ working |
 | Classification scorer | ✅ solid (normalized labels) |
 | Extraction scorer (field-typed) | ✅ solid |
-| Segmentation scorer | 🟡 works; **schema is a working assumption**, recall-first |
+| Segmentation scorer | ✅ per-page start/continue+class model; recall-first; **popular-misses analysis** |
+| Per-run drill-down (popular misses) | ✅ segmentation: merges/splits/class-confusion + per-doc offenders |
+| Class→bucket rollup for segmentation | 🟡 scaffolded (`class_taxonomy.bucket`); empty until the bucket schema lands |
 | Segregation scorer | 🟡 works; applicant-grouping confirmed, metrics are standard |
 | Run identity (semantic name + random dedup id) | ✅ working |
 | Model registry + model cards | ✅ working |
 | W&B auto-ingest | 🔴 scaffolded, gated OFF, unimplemented |
 | Frontend (4-tab board, upload, manual) | ✅ working, no-build vanilla JS |
 | Deploy on the VM / phone access | ❌ not done — runs on localhost only |
-| Per-doc error drill-down UI | ❌ not built (API returns items; no UI) |
+| Per-doc error drill-down UI | 🟡 segmentation has a row drop-down (analysis + offenders); other tasks show items only |
 | classifier-profile / extraction-type CRUD UI | ❌ not built (tables + scoring hooks exist; seed via SQL) |
 | Separate "runs" tab | ❌ deferred by chaitu ("we'll see later") |
 | Tests | ❌ none (only `samples/smoke.sh`) |
@@ -127,7 +129,7 @@ Normalizers live in `server/scoring/util.js`:
 |---|---|---|---|
 | classification | `accuracy` | macro-F1, per-class P/R/F1, out-of-scope count | labels normalized via `normalizeLabel`; profile scopes to a class subset |
 | extraction | `field_accuracy` | `doc_exact_match`, per-field acc | field-typed via `extraction_types.field_schema`; falls back to string if none |
-| segmentation | `boundary_recall` | F1, precision, `missed_boundaries`, exact-match | **recall-first: a missed start page is the costly error** (chaitu) |
+| segmentation | `boundary_recall` | F1, precision, `missed_boundaries`, `spurious_boundaries`, `page_class_accuracy`, exact-match | per-page `start`/`continue`+`class`; **recall-first: a missed start = two docs merged** (chaitu). Row drop-down = *popular misses*: which `class→class` (and `bucket→bucket`) boundaries get merged/split most |
 | segregation | `ari` | purity, #groups | partition agreement (label values don't need to match, only co-membership) |
 
 ---
@@ -170,8 +172,12 @@ Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomp
   UNIQUE index so an auto-ingested source run can't be logged twice.
 - **`normalizeLabel` (not full `normalizeText`) for class codes** — lowercasing/trim fixes real
   casing/whitespace mismatches without mangling controlled codes.
-- **Segmentation is recall-first** — missing a true start page is the error that matters; the
-  page-range model is a working assumption until chaitu supplies the final schema.
+- **Segmentation is per-page + recall-first.** A bundle is an ordered page list, each page tagged
+  `start`/`continue` with its `class` (grouped form of the pipeline's per-page JSONL). A boundary is
+  an internal `start`; missing one silently **merges** two docs → recall is the headline. Every run
+  carries a **popular-misses analysis** (`analysis_json`): the `class→class` transitions most often
+  merged/split, page-level class confusion, and a `bucket→bucket` rollup. Buckets (KYC/PKYC/ITR/…)
+  come from `class_taxonomy.bucket` — scaffolded now, populated when chaitu supplies the mapping.
 - **Auth is deliberately minimal** — one credential in `.env`, scrypt-hashed, HMAC-signed cookie,
   no user table, no dependency. Enough to gate a phone-reachable internal tool; not a multi-user system.
 - **No-build frontend on purpose** — vanilla JS so it runs on the VM/phone immediately. The React +
@@ -200,5 +206,8 @@ Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomp
   and what the coverage gate checks. chaitu defines the doc_id scheme.
 - **Starter credential** used in dev/smoke: `chaitu` / `changeme-artha` — change it before deploying.
 - `.env` is gitignored; only `.env.example` is tracked. `data/` (DB + uploads) is fully gitignored.
-- Two DRAFT scorers carry `[semantics]`/`NOTE` headers in-file — read them before trusting those
-  numbers on real data.
+- **Populate segmentation buckets** → fill `class_taxonomy.bucket` (KYC/PKYC/ITR/financial/property/
+  rental/…). The scorer picks it up automatically (via `scoringOpts`) and the `bucket→bucket` rollup
+  appears in every new run's drop-down; no code change needed.
+- **Segregation** still carries a `[semantics DRAFT]` header in-file — confirm what a "group" means on
+  real data before trusting ARI/purity. Segmentation's format is locked.
