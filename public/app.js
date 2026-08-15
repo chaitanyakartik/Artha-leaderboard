@@ -1,6 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const api = async (url, opts) => {
   const r = await fetch(url, opts);
+  if (r.status === 401) { location.href = '/login.html'; throw new Error('unauthorized'); }
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(body.error || r.statusText), { body, status: r.status });
   return body;
@@ -16,7 +17,18 @@ async function boot() {
   renderTabs();
   renderDatasets();
   bindBar();
+  mountLogout();
   await refresh();
+}
+
+async function mountLogout() {
+  const me = await api('/api/me').catch(() => ({ auth: false }));
+  if (!me.auth) return; // auth not configured -> no logout button
+  const btn = document.createElement('button');
+  btn.id = 'logout';
+  btn.textContent = me.user ? `Sign out (${me.user})` : 'Sign out';
+  btn.onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login.html'; };
+  document.querySelector('header').appendChild(btn);
 }
 
 function renderTabs() {

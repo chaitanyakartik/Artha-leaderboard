@@ -5,12 +5,50 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, ROOT, UPLOAD_DIR } from './db.js';
 import { scoreTask, checkCoverage } from './scoring/index.js';
+import { config, authConfigured } from './config.js';
+import { verifyPassword, issueToken, verifyToken, parseCookies, sessionCookie, clearCookie, COOKIE_NAME } from './auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = Fastify({ logger: false, bodyLimit: 50 * 1024 * 1024 });
 const d = db();
 
 const TASKS = ['segmentation', 'classification', 'extraction', 'segregation'];
+
+// ---- auth gate ------------------------------------------------------------
+// Everything requires a valid session except: the login page, login/health APIs,
+// and the shared static assets the login page itself needs.
+const PUBLIC_PATHS = new Set(['/login.html', '/style.css', '/api/login', '/api/health', '/favicon.ico']);
+
+app.addHook('onRequest', async (req, reply) => {
+  if (!authConfigured()) return; // no credential set yet -> open (dev). Set one via scripts/set-password.js
+  const url = (req.raw.url || '').split('?')[0];
+  if (PUBLIC_PATHS.has(url)) return;
+
+  const token = parseCookies(req.headers.cookie || '')[COOKIE_NAME];
+  const session = verifyToken(token);
+  if (session) { req.user = session.u; return; }
+
+  if (url.startsWith('/api/')) return reply.code(401).send({ error: 'unauthorized' });
+  return reply.redirect('/login.html');
+});
+
+// ---- auth routes ----------------------------------------------------------
+app.post('/api/login', async (req, reply) => {
+  const { username, password } = req.body || {};
+  const ok = authConfigured() &&
+    username === config.user &&
+    verifyPassword(String(password ?? ''), config.passHash);
+  if (!ok) return reply.code(401).send({ error: 'invalid username or password' });
+  reply.header('set-cookie', sessionCookie(issueToken(username)));
+  return { ok: true, user: username };
+});
+
+app.post('/api/logout', async (req, reply) => {
+  reply.header('set-cookie', clearCookie());
+  return { ok: true };
+});
+
+app.get('/api/me', async (req) => ({ user: req.user || null, auth: authConfigured() }));
 
 // ---- reference data -------------------------------------------------------
 app.get('/api/health', async () => ({ ok: true }));

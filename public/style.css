@@ -34,3 +34,12 @@ tr:hover td { background:#12151c; }
 #msg .box.ok { border-left-color:var(--good); }
 .empty { color:var(--mut); padding:24px 12px; }
 code { background:#0b0d11; padding:1px 5px; border-radius:4px; font-size:12px; }
+.login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.login-card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:28px; width:100%; max-width:340px; display:flex; flex-direction:column; gap:14px; }
+.login-card h1 { font-size:20px; margin:0; }
+.login-card .sub { margin-top:-8px; }
+.login-card label { display:flex; flex-direction:column; gap:5px; color:var(--mut); font-size:12px; }
+.login-card input { background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:9px 10px; font-size:14px; }
+.login-card button { padding:10px; font-size:15px; margin-top:4px; }
+.login-err { color:var(--bad); font-size:13px; min-height:16px; }
+#logout { margin-left:8px; }

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Artha Leaderboard — Sign in</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <form id="loginForm" class="login-card">
+      <h1>Artha Leaderboard</h1>
+      <div class="sub">Sign in to continue</div>
+      <label>Username<input id="u" name="username" autocomplete="username" autofocus /></label>
+      <label>Password<input id="p" name="password" type="password" autocomplete="current-password" /></label>
+      <button type="submit" class="primary">Sign in</button>
+      <div id="err" class="login-err"></div>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById('loginForm');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('err');
+      err.textContent = '';
+      const r = await fetch('/api/login', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: document.getElementById('u').value, password: document.getElementById('p').value }),
+      });
+      if (r.ok) { location.href = '/'; }
+      else { const b = await r.json().catch(() => ({})); err.textContent = b.error || 'Sign in failed'; }
+    });
+  </script>
+</body>
+</html>
