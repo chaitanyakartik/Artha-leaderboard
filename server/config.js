@@ -25,6 +25,7 @@ export const config = {
   secret: process.env.ARTHA_SECRET || '',
   port: Number(process.env.PORT || 5173),
   sessionHours: Number(process.env.ARTHA_SESSION_HOURS || 168), // 7 days
+  wandbIngest: String(process.env.ARTHA_WANDB_INGEST || 'off').toLowerCase() === 'on', // future auto-log
 };
 
 export const authConfigured = () => Boolean(config.user && config.passHash && config.secret);

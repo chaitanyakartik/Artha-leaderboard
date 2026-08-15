@@ -1,10 +1,56 @@
 {
-  "_comment": "Canonical model registry — the verified list of model ids. Runs reference these ids, so names can't collide or duplicate. Add new configs here; run `npm run db:init` to sync into the DB.",
+  "_comment": "Canonical model registry + model cards. Each entry describes WHAT a model config is, so the leaderboard is self-documenting. `id` is stable (runs reference it — names can't collide). Edit here, then `npm run db:init` to sync. Card fields: kind (combo|single), components (the actual models in the config), base (finetune base, if any), tasks (which of the 4 it targets), released, notes.",
+  "schema_version": 1,
   "models": [
-    { "id": "qwen-gemini",  "name": "Qwen+Gemini",  "notes": "Qwen OCR + Gemini reasoning" },
-    { "id": "qwen-gemma",   "name": "Qwen+Gemma",   "notes": "Qwen OCR + Gemma reasoning" },
-    { "id": "gemma-only",   "name": "Gemma-only",   "notes": "" },
-    { "id": "gemini-only",  "name": "Gemini-only",  "notes": "" },
-    { "id": "chandra-only", "name": "Chandra-only", "notes": "Chandra OCR (CPT base)" }
+    {
+      "id": "qwen-gemini",
+      "name": "Qwen+Gemini",
+      "kind": "combo",
+      "components": ["Qwen3.5-OCR", "Gemini"],
+      "base": null,
+      "tasks": ["extraction", "classification"],
+      "released": null,
+      "notes": "Qwen does OCR, Gemini does reasoning/extraction."
+    },
+    {
+      "id": "qwen-gemma",
+      "name": "Qwen+Gemma",
+      "kind": "combo",
+      "components": ["Qwen3.5-OCR", "Gemma"],
+      "base": null,
+      "tasks": ["extraction", "classification"],
+      "released": null,
+      "notes": "Qwen OCR + Gemma reasoning."
+    },
+    {
+      "id": "gemma-only",
+      "name": "Gemma-only",
+      "kind": "single",
+      "components": ["Gemma"],
+      "base": null,
+      "tasks": ["extraction", "classification"],
+      "released": null,
+      "notes": ""
+    },
+    {
+      "id": "gemini-only",
+      "name": "Gemini-only",
+      "kind": "single",
+      "components": ["Gemini"],
+      "base": null,
+      "tasks": ["extraction", "classification", "segmentation", "segregation"],
+      "released": null,
+      "notes": "Closed baseline to beat."
+    },
+    {
+      "id": "chandra-only",
+      "name": "Chandra-only",
+      "kind": "single",
+      "components": ["Chandra-OCR"],
+      "base": "Chandra-OCR (CPT base)",
+      "tasks": ["segmentation", "classification", "extraction"],
+      "released": null,
+      "notes": "CPT base; LoRA adapters fine-tuned on top. The in-house track."
+    }
   ]
 }

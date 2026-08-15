@@ -9,6 +9,17 @@ export function normalizeText(v) {
     .trim();
 }
 
+// Lighter normalizer for controlled vocab (class codes, group ids): lowercase +
+// NFKC + collapse whitespace + trim, but NO punctuation stripping — so codes like
+// `bank_statement` and `form-16` stay intact.
+export function normalizeLabel(v) {
+  return String(v ?? '')
+    .toLowerCase()
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function normalizeNumber(v) {
   if (v == null) return null;
   const n = Number(String(v).replace(/[^0-9.\-]/g, ''));

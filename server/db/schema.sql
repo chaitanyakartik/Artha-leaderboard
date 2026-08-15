@@ -21,9 +21,10 @@ CREATE TABLE IF NOT EXISTS datasets (
 -- Canonical model registry. Seeded from /models.json (the verified list of model ids in
 -- the repo root). `id` is a stable slug; runs reference it, so names can't collide or dupe.
 CREATE TABLE IF NOT EXISTS model_configs (
-  id     TEXT PRIMARY KEY,                   -- stable id from models.json, e.g. "qwen-gemini"
-  name   TEXT NOT NULL UNIQUE,               -- display name, e.g. "Qwen+Gemini"
-  notes  TEXT
+  id        TEXT PRIMARY KEY,                -- stable id from models.json, e.g. "qwen-gemini"
+  name      TEXT NOT NULL UNIQUE,            -- display name, e.g. "Qwen+Gemini"
+  notes     TEXT,
+  card_json TEXT                             -- full model card (kind, components, base, tasks, ...)
 );
 
 -- The 140-class taxonomy for classification.
@@ -67,6 +68,8 @@ CREATE TABLE IF NOT EXISTS gt_items (
 -- A scored submission = one leaderboard row.
 CREATE TABLE IF NOT EXISTS runs (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_key               TEXT UNIQUE,         -- <semantic-slug>-<rand6>; dedup identity
+  display_name          TEXT,                -- human name (defaults to semantic), renameable
   task                  TEXT NOT NULL REFERENCES tasks(slug),
   dataset_id            INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
   model_config_id       TEXT NOT NULL REFERENCES model_configs(id),
@@ -76,9 +79,14 @@ CREATE TABLE IF NOT EXISTS runs (
   coverage_status       TEXT,                -- full | partial | manual
   coverage_missing      INTEGER DEFAULT 0,   -- # GT doc_ids not covered by predictions
   source                TEXT NOT NULL DEFAULT 'upload',   -- upload | manual
+  origin                TEXT NOT NULL DEFAULT 'ui',       -- ui | wandb | api (ingestion channel)
+  external_ref          TEXT,                -- provenance + dedup for auto-ingest (e.g. wandb run path)
+  gt_fingerprint        TEXT,                -- GT hash at scoring time (auto-ingest "GT matches" check)
   notes                 TEXT,
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Same external run must not be auto-ingested twice.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_external ON runs(origin, external_ref) WHERE external_ref IS NOT NULL;
 
 -- Flexible per-run metrics (differs by task): accuracy, macro_f1, per-field acc, ...
 CREATE TABLE IF NOT EXISTS run_metrics (

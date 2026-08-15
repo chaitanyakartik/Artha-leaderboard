@@ -1,8 +1,8 @@
 node_modules/
 dist/
 *.sqlite
-*.sqlite-journal
+*.sqlite-*
 *.db
-data/uploads/
+data/
 .env
 .DS_Store

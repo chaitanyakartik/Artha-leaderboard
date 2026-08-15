@@ -1,10 +1,10 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db, ROOT, UPLOAD_DIR } from './db.js';
-import { scoreTask, checkCoverage } from './scoring/index.js';
+import { db, ROOT } from './db.js';
+import { createRun } from './runs.js';
+import { ingestWandb } from './ingest/wandb.js';
 import { config, authConfigured } from './config.js';
 import { verifyPassword, issueToken, verifyToken, parseCookies, sessionCookie, clearCookie, COOKIE_NAME } from './auth.js';
 
@@ -53,7 +53,9 @@ app.get('/api/me', async (req) => ({ user: req.user || null, auth: authConfigure
 // ---- reference data -------------------------------------------------------
 app.get('/api/health', async () => ({ ok: true }));
 app.get('/api/tasks', async () => d.prepare('SELECT slug, label, sort_order FROM tasks ORDER BY sort_order').all());
-app.get('/api/models', async () => d.prepare('SELECT id, name, notes FROM model_configs ORDER BY name').all());
+app.get('/api/models', async () =>
+  d.prepare('SELECT id, name, notes, card_json FROM model_configs ORDER BY name').all()
+    .map((m) => ({ id: m.id, name: m.name, notes: m.notes, card: m.card_json ? JSON.parse(m.card_json) : null })));
 
 // ---- datasets -------------------------------------------------------------
 app.get('/api/datasets', async () => d.prepare('SELECT * FROM datasets ORDER BY created_at DESC').all());
@@ -108,11 +110,11 @@ app.get('/api/datasets/:id/gt', async (req) => {
   return Object.fromEntries(rows.map((r) => [r.task, r.c]));
 });
 
-function loadGt(datasetId, task) {
-  const rows = d.prepare('SELECT doc_id, gold_json FROM gt_items WHERE dataset_id = ? AND task = ?').all(datasetId, task);
-  const gt = {};
-  for (const r of rows) gt[r.doc_id] = JSON.parse(r.gold_json);
-  return gt;
+// Map a createRun() failure code to an HTTP status.
+const CODE_STATUS = { coverage_incomplete: 422, unknown_model: 400, unknown_dataset: 404, no_gt: 400, duplicate_external: 409, gt_mismatch: 409, bad_payload: 400 };
+function sendResult(reply, res) {
+  if (res.ok) return res;
+  return reply.code(CODE_STATUS[res.code] || 400).send({ error: res.code, ...res });
 }
 
 // ---- runs (score a predictions file) --------------------------------------
@@ -120,91 +122,41 @@ function loadGt(datasetId, task) {
 //         profile_id?, extraction_type_id?, override?, notes? }
 app.post('/api/runs', async (req, reply) => {
   const b = req.body || {};
-  const { task, dataset_id, model_config_id, predictions, profile_id, extraction_type_id, override, notes } = b;
-  if (!TASKS.includes(task)) return reply.code(400).send({ error: 'bad task' });
-  if (!predictions || typeof predictions !== 'object') return reply.code(400).send({ error: 'predictions object required' });
-  if (!d.prepare('SELECT 1 FROM model_configs WHERE id = ?').get(model_config_id))
-    return reply.code(400).send({ error: `unknown model_config_id "${model_config_id}"` });
-
-  const gt = loadGt(Number(dataset_id), task);
-  const gtIds = Object.keys(gt);
-  if (gtIds.length === 0) return reply.code(400).send({ error: 'no ground truth uploaded for this dataset+task' });
-
-  const cov = checkCoverage(Object.keys(predictions), gtIds);
-  if (!cov.full && !override) {
-    return reply.code(422).send({
-      error: 'coverage_incomplete',
-      message: `${cov.missing.length} GT doc(s) have no prediction`,
-      missing: cov.missing.slice(0, 50),
-      missing_count: cov.missing.length,
-      hint: 'resubmit with override:true to score the covered subset only',
-    });
-  }
-
-  // scope GT to covered docs when overriding
-  const scoredGt = cov.full ? gt : Object.fromEntries(gtIds.filter((id) => predictions[id] != null).map((id) => [id, gt[id]]));
-
-  let opts = {};
-  if (task === 'classification' && profile_id) {
-    const codes = d.prepare(
-      `SELECT c.code FROM profile_classes pc JOIN class_taxonomy c ON c.id = pc.class_id WHERE pc.profile_id = ?`
-    ).all(profile_id).map((r) => r.code);
-    opts.profileClasses = codes;
-  }
-  if (task === 'extraction' && extraction_type_id) {
-    const et = d.prepare('SELECT field_schema FROM extraction_types WHERE id = ?').get(extraction_type_id);
-    if (et?.field_schema) opts.fieldSchema = JSON.parse(et.field_schema);
-  }
-
-  const result = scoreTask(task, predictions, scoredGt, opts);
-
-  const tx = d.transaction(() => {
-    const info = d.prepare(
-      `INSERT INTO runs (task, dataset_id, model_config_id, extraction_type_id, classifier_profile_id,
-                         predictions_path, coverage_status, coverage_missing, source, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'upload', ?)`
-    ).run(task, Number(dataset_id), model_config_id, extraction_type_id ?? null, profile_id ?? null,
-          null, cov.full ? 'full' : 'partial', cov.missing.length, notes ?? null);
-    const runId = info.lastInsertRowid;
-
-    const predPath = path.join(UPLOAD_DIR, `run-${runId}.json`);
-    fs.writeFileSync(predPath, JSON.stringify(predictions));
-    d.prepare('UPDATE runs SET predictions_path = ? WHERE id = ?').run(predPath, runId);
-
-    const mStmt = d.prepare('INSERT INTO run_metrics (run_id, key, value, scope) VALUES (?, ?, ?, ?)');
-    for (const m of result.metrics) mStmt.run(runId, m.key, m.value, m.scope);
-
-    const iStmt = d.prepare(
-      'INSERT INTO item_results (run_id, doc_id, predicted_json, gold_json, correct, detail_json) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    for (const it of result.items) iStmt.run(runId, it.doc_id, it.predicted_json, it.gold_json, it.correct, it.detail_json);
-    return runId;
-  });
-  const runId = tx();
-
-  return { run_id: runId, coverage: cov.full ? 'full' : 'partial', missing_count: cov.missing.length, headline: result.headline, metrics: result.metrics };
+  if (!TASKS.includes(b.task)) return reply.code(400).send({ error: 'bad task' });
+  if (!b.predictions || typeof b.predictions !== 'object') return reply.code(400).send({ error: 'predictions object required' });
+  return sendResult(reply, createRun(d, {
+    task: b.task, datasetId: Number(b.dataset_id), modelId: b.model_config_id,
+    predictions: b.predictions, override: b.override,
+    profileId: b.profile_id, extractionTypeId: b.extraction_type_id, notes: b.notes,
+  }));
 });
 
 // Manual entry (type a number directly, no predictions file / no scoring).
 // Body: { task, dataset_id, model_config_id, metrics: {key: value}, notes? }
 app.post('/api/runs/manual', async (req, reply) => {
-  const { task, dataset_id, model_config_id, metrics, notes } = req.body || {};
-  if (!TASKS.includes(task)) return reply.code(400).send({ error: 'bad task' });
-  if (!metrics || typeof metrics !== 'object') return reply.code(400).send({ error: 'metrics object required' });
-  if (!d.prepare('SELECT 1 FROM model_configs WHERE id = ?').get(model_config_id))
-    return reply.code(400).send({ error: 'unknown model_config_id' });
+  const b = req.body || {};
+  if (!TASKS.includes(b.task)) return reply.code(400).send({ error: 'bad task' });
+  if (!b.metrics || typeof b.metrics !== 'object') return reply.code(400).send({ error: 'metrics object required' });
+  return sendResult(reply, createRun(d, {
+    task: b.task, datasetId: Number(b.dataset_id), modelId: b.model_config_id,
+    manualMetrics: b.metrics, notes: b.notes,
+  }));
+});
 
-  const tx = d.transaction(() => {
-    const info = d.prepare(
-      `INSERT INTO runs (task, dataset_id, model_config_id, coverage_status, source, notes)
-       VALUES (?, ?, ?, 'manual', 'manual', ?)`
-    ).run(task, Number(dataset_id), model_config_id, notes ?? null);
-    const runId = info.lastInsertRowid;
-    const mStmt = d.prepare('INSERT INTO run_metrics (run_id, key, value, scope) VALUES (?, ?, ?, ?)');
-    for (const [k, v] of Object.entries(metrics)) mStmt.run(runId, k, Number(v), 'overall');
-    return runId;
-  });
-  return { run_id: tx() };
+// Rename a run's display name (run_key / identity stays fixed).
+app.patch('/api/runs/:id', async (req, reply) => {
+  const { display_name } = req.body || {};
+  if (!display_name) return reply.code(400).send({ error: 'display_name required' });
+  const info = d.prepare('UPDATE runs SET display_name = ? WHERE id = ?').run(display_name, Number(req.params.id));
+  if (!info.changes) return reply.code(404).send({ error: 'not found' });
+  return { ok: true };
+});
+
+// ---- W&B auto-ingest (SCAFFOLD, gated off by default) ----------------------
+// Enable with ARTHA_WANDB_INGEST=on. Reuses createRun() so scoring is identical.
+app.post('/api/ingest/wandb', async (req, reply) => {
+  if (!config.wandbIngest) return reply.code(501).send({ error: 'wandb_ingest_disabled', message: 'set ARTHA_WANDB_INGEST=on to enable (future feature)' });
+  return sendResult(reply, ingestWandb(d, req.body || {}));
 });
 
 // ---- leaderboard ----------------------------------------------------------

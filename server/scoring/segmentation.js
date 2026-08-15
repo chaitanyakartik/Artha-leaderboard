@@ -1,8 +1,9 @@
-// Segmentation scorer  [semantics DRAFT — confirm what a "segment" is].
-// Model: a doc (bundle) is split into ordered page ranges.
+// Segmentation scorer.  Model: a doc (bundle) is split into ordered page ranges.
 // pred/gt: doc_id -> [[start,end], ...]  OR  [{start,end}|{start_page,end_page}, ...]
 // Metric: boundary P/R/F1 over the internal cut points (segment starts, minus the doc start),
-//         plus exact-match rate (identical boundary sets).
+//         plus exact-match rate. HEADLINE = RECALL: per chaitu, a missed start page is the
+//         failure that matters most, so recall is the primary number.
+// NOTE: page-range model is the working assumption; chaitu to supply the final segment schema.
 import { prf, round } from './util.js';
 
 function boundaries(segs) {
@@ -42,11 +43,13 @@ export function score(pred, gt) {
   const exactRate = nDocs ? round(exact / nDocs) : 0;
 
   return {
-    headline: { key: 'boundary_f1', value: f1 },
+    // Recall is the headline: missing a true start page is the costly error.
+    headline: { key: 'boundary_recall', value: recall },
     metrics: [
+      { key: 'boundary_recall', value: recall, scope: 'overall' },
       { key: 'boundary_f1', value: f1, scope: 'overall' },
       { key: 'boundary_precision', value: precision, scope: 'overall' },
-      { key: 'boundary_recall', value: recall, scope: 'overall' },
+      { key: 'missed_boundaries', value: fn, scope: 'overall' },
       { key: 'exact_match', value: exactRate, scope: 'overall' },
       { key: 'n_docs', value: nDocs, scope: 'overall' },
     ],

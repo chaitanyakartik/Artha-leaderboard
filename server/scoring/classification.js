@@ -3,16 +3,18 @@
 // gt:    doc_id -> class code (string) | { class|label }
 // opts.profileClasses: optional array of class codes the classifier was trained for.
 //   When given, metrics are SCOPED to docs whose true class is in that subset.
-import { prf, round } from './util.js';
+import { prf, round, normalizeLabel } from './util.js';
 
+// Extract the class label from a value, then normalize (lowercase + trim, codes intact)
+// so "Aadhaar" / "aadhaar" / "aadhaar " all compare equal.
 const cls = (v) => {
   if (v == null) return null;
-  if (typeof v === 'object') return v.class ?? v.label ?? v.predicted ?? null;
-  return v;
+  const raw = typeof v === 'object' ? (v.class ?? v.label ?? v.predicted ?? null) : v;
+  return raw == null ? null : normalizeLabel(raw);
 };
 
 export function score(pred, gt, { profileClasses } = {}) {
-  const scope = profileClasses && profileClasses.length ? new Set(profileClasses.map(String)) : null;
+  const scope = profileClasses && profileClasses.length ? new Set(profileClasses.map(normalizeLabel)) : null;
   const stats = new Map(); // label -> {tp, fp, fn}
   const bump = (label, k) => {
     if (!stats.has(label)) stats.set(label, { tp: 0, fp: 0, fn: 0 });
