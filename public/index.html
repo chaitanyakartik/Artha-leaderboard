@@ -18,8 +18,16 @@
     <label>Dataset
       <select id="dataset"></select>
     </label>
+    <label id="ctxLabel" hidden><span id="ctxName">Template</span>
+      <select id="context"></select>
+    </label>
+    <label>Prompt
+      <select id="prompt"></select>
+    </label>
     <span id="gtStatus" class="gt"></span>
     <div class="spacer"></div>
+    <button id="newProfile" hidden>+ Profile</button>
+    <button id="newPrompt">+ Prompt</button>
     <button id="newDataset">+ Dataset</button>
     <button id="uploadGt">Upload GT</button>
     <button id="addRun" class="primary">+ Add run</button>

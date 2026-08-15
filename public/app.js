@@ -8,7 +8,10 @@ const api = async (url, opts) => {
 };
 const msg = (html, cls = '') => { $('#msg').innerHTML = html ? `<div class="box ${cls}">${html}</div>` : ''; };
 
-const state = { task: 'classification', tasks: [], models: [], datasets: [], datasetId: null };
+const state = {
+  task: 'classification', tasks: [], models: [], datasets: [], datasetId: null,
+  contextItems: [], contextId: null, prompts: [], promptId: null,
+};
 
 async function boot() {
   [state.tasks, state.models, state.datasets] = await Promise.all([
@@ -66,6 +69,64 @@ function bindBar() {
   $('#uploadGt').onclick = () => pickJson((data, fname) => uploadGt(data, fname));
   $('#addRun').onclick = () => pickJson((data, fname) => addRun(data, fname));
   $('#manualRun').onclick = manualRun;
+  $('#newPrompt').onclick = newPrompt;
+  $('#newProfile').onclick = newProfile;
+  $('#context').onchange = (e) => { state.contextId = Number(e.target.value) || null; loadPrompts().then(refresh); };
+  $('#prompt').onchange = (e) => { state.promptId = Number(e.target.value) || null; };
+}
+
+// Context selector = extraction Template (extraction_type) or classification Profile.
+async function loadContext() {
+  const wrap = $('#ctxLabel'), sel = $('#context');
+  $('#newProfile').hidden = state.task !== 'classification';
+  if (state.task === 'extraction') {
+    $('#ctxName').textContent = 'Template';
+    state.contextItems = await api('/api/extraction-types').catch(() => []);
+  } else if (state.task === 'classification') {
+    $('#ctxName').textContent = 'Profile';
+    state.contextItems = await api('/api/classifier-profiles').catch(() => []);
+  } else { state.contextItems = []; }
+  if (!state.contextItems.length && state.task !== 'extraction' && state.task !== 'classification') { wrap.hidden = true; state.contextId = null; return; }
+  wrap.hidden = false;
+  const none = state.task === 'extraction' ? '— all templates —' : '— none —';
+  sel.innerHTML = `<option value="">${none}</option>` +
+    state.contextItems.map((it) => `<option value="${it.id}">${it.name}${it.n_classes != null ? ` (${it.n_classes})` : ''}</option>`).join('');
+  if (state.contextId && !state.contextItems.some((it) => it.id === state.contextId)) state.contextId = null;
+  sel.value = state.contextId || '';
+}
+
+async function loadPrompts() {
+  const sel = $('#prompt');
+  let url = `/api/prompts?task=${state.task}`;
+  if (state.task === 'extraction' && state.contextId) url += `&extraction_type_id=${state.contextId}`;
+  state.prompts = await api(url).catch(() => []);
+  sel.innerHTML = '<option value="">— no prompt —</option>' +
+    state.prompts.map((p) => `<option value="${p.id}">${p.name}${p.version ? ` ${p.version}` : ''}</option>`).join('');
+  if (state.promptId && !state.prompts.some((p) => p.id === state.promptId)) state.promptId = null;
+  sel.value = state.promptId || '';
+}
+
+async function newPrompt() {
+  const name = prompt('Prompt name:'); if (!name) return;
+  const version = prompt('Version (optional, e.g. v1):') || null;
+  const text = prompt('Paste the prompt text:'); if (!text) return;
+  const body = { task: state.task, name, version, text };
+  if (state.task === 'extraction' && state.contextId) body.extraction_type_id = state.contextId;
+  try {
+    const p = await api('/api/prompts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    state.promptId = p.id; await loadPrompts(); msg(`Prompt <code>${p.name}</code> saved.`, 'ok');
+  } catch (e) { msg(e.message, 'err'); }
+}
+
+async function newProfile() {
+  const name = prompt('Profile name (e.g. kyc-only):'); if (!name) return;
+  const codes = prompt('Enabled class codes, comma-separated:');
+  const classes = (codes || '').split(',').map((s) => s.trim()).filter(Boolean);
+  try {
+    const p = await api('/api/classifier-profiles', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, classes }) });
+    state.contextId = p.id; await loadContext();
+    msg(`Profile <code>${p.name}</code>: ${p.n_classes} classes${p.missing_codes.length ? `, ${p.missing_codes.length} unknown (${p.missing_codes.join(', ')})` : ''}.`, p.missing_codes.length ? 'err' : 'ok');
+  } catch (e) { msg(e.message, 'err'); }
 }
 
 // --- file picker helper: reads a JSON file, hands back parsed content ---
@@ -109,6 +170,9 @@ async function addRun(data, fname) {
   if (!model) return;
   const predictions = data.predictions || data;
   const payload = { task: state.task, dataset_id: state.datasetId, model_config_id: model, predictions };
+  if (state.promptId) payload.prompt_id = state.promptId;
+  if (state.task === 'extraction' && state.contextId) payload.extraction_type_id = state.contextId;
+  if (state.task === 'classification' && state.contextId) payload.profile_id = state.contextId;
   try {
     const res = await api('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     msg(`Scored <code>${fname}</code> — ${res.headline.key} = <b>${res.headline.value}</b> (coverage: ${res.coverage}).`, 'ok');
@@ -149,6 +213,8 @@ function pickModel() {
 }
 
 async function refresh() {
+  await loadContext();
+  await loadPrompts();
   // GT status line
   if (state.datasetId) {
     const gt = await api(`/api/datasets/${state.datasetId}/gt`).catch(() => ({}));
@@ -158,7 +224,10 @@ async function refresh() {
     el.className = 'gt' + (c ? ' ok' : '');
   } else $('#gtStatus').textContent = '';
 
-  renderBoard(state.datasetId ? await api(`/api/leaderboard?task=${state.task}&dataset_id=${state.datasetId}`) : []);
+  let runs = state.datasetId ? await api(`/api/leaderboard?task=${state.task}&dataset_id=${state.datasetId}`) : [];
+  // Extraction: a chosen template filters the board to that doc-type's runs.
+  if (state.task === 'extraction' && state.contextId) runs = runs.filter((r) => r.extraction_type_id === state.contextId);
+  renderBoard(runs);
 }
 
 function renderBoard(runs) {
@@ -174,7 +243,11 @@ function renderBoard(runs) {
     const cells = metricKeys.map((k) => `<td class="num">${r.metrics[k] ?? '—'}</td>`).join('');
     const cov = `<span class="badge ${r.coverage_status}">${r.coverage_status}${r.coverage_missing ? ` −${r.coverage_missing}` : ''}</span>`;
     const when = (r.created_at || '').replace('T', ' ').slice(0, 16);
-    const name = `<button class="expand" data-id="${r.id}" title="${r.display_name || ''}">▸ ${r.model_name}</button>`;
+    const tags = [];
+    if (r.extraction_type_name) tags.push(`▦ ${r.extraction_type_name}`);
+    if (r.prompt_name) tags.push(`✎ ${r.prompt_name}${r.prompt_version ? ' ' + r.prompt_version : ''}`);
+    const sub = tags.length ? `<div class="rowsub">${tags.join(' · ')}</div>` : '';
+    const name = `<button class="expand" data-id="${r.id}" title="${r.display_name || ''}">▸ ${r.model_name}</button>${sub}`;
     return `<tr data-row="${r.id}"><td>${name}</td>${cells}<td>${cov}</td><td class="num">${when}</td><td><button class="del" data-id="${r.id}">✕</button></td></tr>
             <tr class="detail" id="detail-${r.id}" hidden><td colspan="${span}"></td></tr>`;
   }).join('');
@@ -252,17 +325,70 @@ function confusionMatrix(cm) {
   return `<div class="matrix"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
+function reaggTools(run, note = '') {
+  return `<div class="drawer-tools"><button class="reagg" data-id="${run.id}">↻ re-aggregate</button>${note}</div>`;
+}
+function offenders(run) {
+  const bad = (run.items || []).filter((it) => it.correct === 0);
+  if (!bad.length) return '';
+  const rows = bad.slice(0, 30).map((it) => [`<code>${esc(it.doc_id)}</code>`, '']);
+  return `<div class="misses"><h4>Docs with errors (${bad.length})</h4>${kvTable(['doc', ''], rows)}</div>`;
+}
+function findingsBlock(a, tail) {
+  const kf = (a.overview?.key_findings || []).map((f) => `<li>${esc(f)}</li>`).join('');
+  return section('Overview', `${kf ? `<ul class="findings">${kf}</ul>` : '<p class="muted">No notable patterns.</p>'}${tail ? `<p class="muted">${tail}</p>` : ''}`);
+}
+
+// Dispatch by analysis shape: segmentation / extraction / classification / (none → offenders).
 function renderDetail(run) {
   const a = run.analysis;
-  if (!a || !a.overview) {
-    // non-segmentation (or legacy) run: just show offenders
-    const bad = (run.items || []).filter((it) => it.correct === 0);
-    if (!bad.length) return '<p class="muted">No detailed analysis for this run.</p>';
-    const rows = bad.slice(0, 30).map((it) => [`<code>${esc(it.doc_id)}</code>`, '']);
-    return `<div class="misses"><h4>Docs with errors (${bad.length})</h4>${kvTable(['doc', ''], rows)}</div>`;
+  if (a && a.boundary) return renderSegDetail(run);
+  if (a && a.per_field) return renderExtractionDetail(run);
+  if (a && (a.per_class || a.enabled)) return renderClassDetail(run);
+  return offenders(run) || '<p class="muted">No detailed analysis for this run.</p>';
+}
+
+function renderClassDetail(run) {
+  const a = run.analysis;
+  let html = reaggTools(run);
+  html += findingsBlock(a, `${a.overview.n_scored} scored · ${a.overview.n_out_of_scope} out of scope`);
+  html += `<div class="stats"><span>accuracy <b>${a.accuracy}</b></span><span>macro-F1 <b>${a.macro_f1}</b></span>
+    <span>enabled <b>${a.enabled.count ?? '?'}/${a.enabled.master_count || '?'}</b></span></div>`;
+  // enabled vs disabled
+  const dis = a.disabled.classes || [], unt = a.enabled.untested || [];
+  html += section('Enabled vs disabled classes', `
+    <p><b>${(a.enabled.classes || []).length}</b> enabled${a.enabled.classes?.length ? `: ${a.enabled.classes.map((c) => `<code>${esc(c)}</code>`).join(' ')}` : ''}</p>
+    <p class="${dis.length ? 'bad' : 'muted'}"><b>${dis.length}</b> NOT enabled in this run${dis.length ? `: ${dis.map((c) => `<code>${esc(c)}</code>`).join(' ')}` : ''}</p>
+    ${unt.length ? `<p class="muted">Enabled but untested here (no GT docs): ${unt.map((c) => `<code>${esc(c)}</code>`).join(' ')}</p>` : ''}
+    ${a.enabled.count == null ? '<p class="muted">No profile chosen — scored against all GT classes.</p>' : ''}`);
+  // per-class (worst first)
+  if ((a.per_class || []).length) {
+    const rows = a.per_class.map((c) => [c.class, c.precision, c.recall, c.f1, c.support, c.n_pred]);
+    html += section('Per-class (worst first)', kvTable(['class', 'P', 'R', 'F1', 'support', '#pred'], rows));
   }
+  html += section('Confusion matrix (top classes)', confusionMatrix(a.confusion_matrix) || '<p class="muted">too few classes</p>');
+  html += offenders(run);
+  return html;
+}
+
+function renderExtractionDetail(run) {
+  const a = run.analysis;
+  let html = reaggTools(run);
+  html += findingsBlock(a, `${a.overview.n_docs} docs · ${a.overview.n_fields} fields`);
+  html += `<div class="stats">
+    <span>field acc (micro) <b>${a.field_accuracy}</b></span><span>field acc (macro) <b>${a.macro_field_accuracy}</b></span>
+    <span>char-sim (micro) <b>${a.micro_char_sim}</b></span><span>char-sim (macro) <b>${a.macro_char_sim}</b></span>
+    <span>doc-exact <b>${a.doc_exact_match}</b></span></div>`;
+  const rows = (a.per_field || []).map((f) => [f.field, f.accuracy, f.support, f.char_sim]);
+  html += section('Field-wise (accuracy · support · char-sim)', kvTable(['field', 'accuracy', 'support (#docs)', 'char-sim'], rows));
+  html += offenders(run);
+  return html;
+}
+
+function renderSegDetail(run) {
+  const a = run.analysis;
   const bd = a.boundary, pm = a.transitions || {};
-  let html = `<div class="drawer-tools"><button class="reagg" data-id="${run.id}">↻ re-aggregate from events</button>${a.buckets_mapped ? '' : ' <span class="muted">buckets not mapped — bucket views empty until <code>class_taxonomy.bucket</code> is filled</span>'}</div>`;
+  let html = reaggTools(run, a.buckets_mapped ? '' : '<span class="muted">buckets not mapped — bucket views empty until <code>class_taxonomy.bucket</code> is filled</span>');
 
   // Overview
   const kf = (a.overview.key_findings || []).map((f) => `<li>${esc(f)}</li>`).join('');

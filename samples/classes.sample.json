@@ -1,0 +1,9 @@
+[
+  { "code": "aadhaar",        "label": "Aadhaar",          "bucket": "KYC" },
+  { "code": "pan",            "label": "PAN",              "bucket": "KYC" },
+  { "code": "bank_statement", "label": "Bank Statement",   "bucket": "financial" },
+  { "code": "salary_slip",    "label": "Salary Slip",      "bucket": "financial" },
+  { "code": "itr",            "label": "ITR",              "bucket": "ITR" },
+  { "code": "rent_agreement", "label": "Rent Agreement",   "bucket": "rental" },
+  { "code": "sale_deed",      "label": "Sale Deed",        "bucket": "property" }
+]

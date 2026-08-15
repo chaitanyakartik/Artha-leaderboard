@@ -68,8 +68,10 @@ Two ways to add a row:
 
 - **P1 — DONE:** repo, schema, seed, API, GT upload + coverage gate, **all four scorers**, minimal
   4-tab UI, login gate, run identity/dedup, model cards, W&B ingest scaffold (gated off).
-- **P2 — next:** deploy on the VM + phone access; per-doc error drill-down; classifier-profile /
-  extraction-type CRUD UI.
+- **P1.5 — DONE:** classification enabled-class snapshot + per-class/confusion drill-down; extraction
+  templates + per-field support + macro/micro + char-similarity; prompt library (per-run reference);
+  taxonomy importers. All classification/extraction views re-aggregate from `item_results`.
+- **P2 — next:** deploy on the VM + phone access; richer profile/type/prompt editors (create+select exist).
 - **P3:** run-to-run **regression comparison** (cheap: diff aggregates over the shared `analysis_events`);
   lock segregation semantics on real data; extraction field-schema editor.
 - **P4:** auto-ingestion (Madhav's val pipeline POSTs results) -> **W&B auto-log** on training runs
@@ -89,7 +91,8 @@ datasets            {name, n_applicants, n_docs, source_manifest, notes}
 model_configs       {name}  (seeded 5, extensible)
 class_taxonomy      the 140-class list
 classifier_profiles {name}  + profile_classes(profile_id, class_id)   (classification)
-extraction_types    {name, field_schema}                              (extraction)
+extraction_types    {name, field_schema}  selectable templates       (extraction)
+prompts             {task, extraction_type_id?, name, version, text}  <- runs reference one
 gt_items            {dataset_id, task, doc_id, source_ref, gold_json}  <- coverage gate reads these
 runs                {task, dataset_id, model_config_id, extraction_type_id?, classifier_profile_id?,
                      predictions_path, coverage_status, created_at, notes}

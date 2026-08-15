@@ -1,0 +1,23 @@
+[
+  {
+    "name": "rent_agreement",
+    "notes": "Rental deed key fields",
+    "fields": [
+      { "name": "tenant_name",   "type": "string" },
+      { "name": "landlord_name", "type": "string" },
+      { "name": "monthly_rent",  "type": "amount" },
+      { "name": "start_date",    "type": "date" },
+      { "name": "deposit",       "type": "amount" }
+    ]
+  },
+  {
+    "name": "shop_act",
+    "notes": "Shop & Establishment licence",
+    "fields": [
+      { "name": "business_name", "type": "string" },
+      { "name": "owner_name",    "type": "string" },
+      { "name": "licence_no",    "type": "string" },
+      { "name": "valid_upto",    "type": "date" }
+    ]
+  }
+]

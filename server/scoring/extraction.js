@@ -1,38 +1,24 @@
-// Extraction scorer — field-typed matching ("real accuracy", not raw exact-match).
-// pred: doc_id -> { field: value }
-// gt:   doc_id -> { field: value }
-// opts.fieldSchema: optional [{ name, type }] (type: string|number|amount|date).
-//   Missing schema => all fields treated as string; field set inferred from GT.
-import { fieldMatch, round } from './util.js';
+// Extraction scorer — field-typed matching; stores raw pred/gold per field so char-similarity and
+// macro/micro can be re-derived later. All breakdowns live in extraction_aggregate.js.
+// pred/gt: doc_id -> { field: value }
+// opts.fieldSchema: optional [{ name, type }] (type: string|number|amount|date). Missing schema =>
+//   all fields string; field set inferred from GT (present-based support).
+import { fieldMatch } from './util.js';
+import { aggregate } from './extraction_aggregate.js';
 
-export function score(pred, gt, { fieldSchema } = {}) {
+export function score(pred, gt, opts = {}) {
+  const fieldSchema = opts.fieldSchema;
   const typeOf = new Map((fieldSchema || []).map((f) => [f.name, f.type || 'string']));
 
-  const fieldStats = new Map(); // field -> {correct, total}
-  const bump = (field, ok) => {
-    if (!fieldStats.has(field)) fieldStats.set(field, { correct: 0, total: 0 });
-    const s = fieldStats.get(field);
-    s.total++; if (ok) s.correct++;
-  };
-
   const items = [];
-  let docExact = 0, nDocs = 0, totalFields = 0, correctFields = 0;
-
   for (const doc of Object.keys(gt)) {
     const g = gt[doc] || {};
     const p = pred[doc] || {};
-    const fields = Object.keys(g);
-    let allOk = fields.length > 0;
     const detail = {};
-
-    for (const f of fields) {
-      const ok = fieldMatch(p[f], g[f], typeOf.get(f) || 'string');
-      bump(f, ok);
-      detail[f] = { pred: p[f] ?? null, gold: g[f], ok };
-      totalFields++; if (ok) correctFields++; else allOk = false;
+    for (const f of Object.keys(g)) {
+      detail[f] = { pred: p[f] ?? null, gold: g[f], ok: fieldMatch(p[f], g[f], typeOf.get(f) || 'string') };
     }
-
-    nDocs++; if (allOk) docExact++;
+    const allOk = Object.keys(g).length > 0 && Object.values(detail).every((x) => x.ok);
     items.push({
       doc_id: doc,
       predicted_json: JSON.stringify(p),
@@ -42,17 +28,15 @@ export function score(pred, gt, { fieldSchema } = {}) {
     });
   }
 
-  const fieldAccuracy = totalFields ? round(correctFields / totalFields) : 0;
-  const docExactMatch = nDocs ? round(docExact / nDocs) : 0;
-
+  const analysis = aggregate(items, { fieldSchema });
   const metrics = [
-    { key: 'field_accuracy', value: fieldAccuracy, scope: 'overall' },
-    { key: 'doc_exact_match', value: docExactMatch, scope: 'overall' },
-    { key: 'n_docs', value: nDocs, scope: 'overall' },
+    { key: 'field_accuracy', value: analysis.field_accuracy, scope: 'overall' },        // micro (headline)
+    { key: 'macro_field_accuracy', value: analysis.macro_field_accuracy, scope: 'overall' },
+    { key: 'char_similarity', value: analysis.micro_char_sim, scope: 'overall' },
+    { key: 'doc_exact_match', value: analysis.doc_exact_match, scope: 'overall' },
+    { key: 'n_docs', value: analysis.overview.n_docs, scope: 'overall' },
   ];
-  for (const [f, s] of fieldStats) {
-    metrics.push({ key: `field:${f}`, value: s.total ? round(s.correct / s.total) : 0, scope: 'per_field' });
-  }
+  for (const f of analysis.per_field) metrics.push({ key: `field:${f.field}`, value: f.accuracy, scope: 'per_field' });
 
-  return { headline: { key: 'field_accuracy', value: fieldAccuracy }, metrics, items };
+  return { headline: { key: 'field_accuracy', value: analysis.field_accuracy }, metrics, items, analysis };
 }

@@ -67,3 +67,30 @@ export const round = (x, d = 4) => (x == null ? null : Math.round(x * 10 ** d) /
 
 // nC2
 export const choose2 = (n) => (n * (n - 1)) / 2;
+
+// Levenshtein edit distance (iterative, two-row).
+export function levenshtein(a, b) {
+  a = String(a ?? ''); b = String(b ?? '');
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Character-similarity rate in [0,1]: 1 - edit_distance / max_len, on normalized text.
+// The "how close was it" signal that raw exact-match misses (e.g. one-char OCR slips).
+export function charSim(pred, gold) {
+  const a = normalizeText(pred), b = normalizeText(gold);
+  if (!a && !b) return 1;
+  const m = Math.max(a.length, b.length);
+  return m ? round(1 - levenshtein(a, b) / m) : 1;
+}

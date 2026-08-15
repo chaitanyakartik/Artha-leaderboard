@@ -18,8 +18,10 @@ One place to answer *"which model config wins, on which task, on which dataset."
 | Backend API (Fastify + SQLite) | ✅ working |
 | Login gate (scrypt + signed cookie) | ✅ working |
 | Coverage gate (GT-completeness before scoring) | ✅ working |
-| Classification scorer | ✅ solid (normalized labels) |
-| Extraction scorer (field-typed) | ✅ solid |
+| Classification scorer | ✅ per-class P/R/F1 + confusion; **enabled-class snapshot** vs master |
+| Extraction scorer (field-typed) | ✅ per-field **support**, **macro vs micro**, **char-similarity**, doc-templates |
+| Prompt library (per-run prompt reference) | ✅ full text, versioned; leaderboard shows it |
+| Taxonomy importers (classes, extraction types) | ✅ idempotent scripts; run when chaitu shares the files |
 | Segmentation scorer | ✅ per-page start/continue+class; **event-sourced** (one event/page) |
 | Segmentation analysis views | ✅ boundary, confusion matrix, per-class/bucket, segment-length, over/under, worst-docs, error taxonomy, transitions+examples, confidence |
 | Per-run drill-down UI | ✅ structured, collapsible sections; re-aggregate button |
@@ -87,11 +89,17 @@ server/
   scoring/
     index.js           dispatch + checkCoverage() (the coverage gate)
     util.js            normalizers (text/label/number/date) + P/R/F1 helpers
-    classification.js  accuracy, macro-F1, per-class F1, profile-subset scoping
-    extraction.js      field-typed match, per-field + per-doc accuracy
+    classification.js  scorer: per-doc items + headline; delegates breakdowns to class_aggregate
+    class_aggregate.js PURE: items -> accuracy, macro-F1, per-class P/R/F1, confusion, enabled/disabled
+    extraction.js      scorer: per-doc field items; delegates to extraction_aggregate
+    extraction_aggregate.js PURE: items -> per-field acc+support+char-sim, macro vs micro
     segmentation.js    per-page scorer: emits atomic EVENTS (one/page) + headline recall
-    seg_aggregate.js   PURE aggregator: events -> all analysis views (re-runnable from DB)
+    seg_aggregate.js   PURE aggregator: events -> all segmentation analysis views
+    aggregate.js       task dispatcher: aggregateTask(task, atomic, opts) (used by score + reaggregate)
     segregation.js     Adjusted Rand Index + purity (partition agreement)
+scripts/
+  import-classes.js          master class taxonomy -> class_taxonomy (idempotent)
+  import-extraction-types.js extraction taxonomy -> extraction_types.field_schema
 public/                no-build vanilla-JS UI: index.html, app.js, style.css, login.html
 scripts/set-password.js  set/reset the login credential
 samples/               example GT + prediction files, smoke.sh
@@ -110,8 +118,12 @@ coverage and scoring are consistent across the UI, manual entry, and future W&B 
 - `model_configs` — registry; **`id` is a stable slug (PK)**, `card_json` holds the model card.
 - `class_taxonomy` (the 140 classes), `classifier_profiles` + `profile_classes` — which subset a
   classifier was trained for (classification scoping).
-- `extraction_types` — per-doc-type variants + `field_schema` (drives field-typed scoring).
+- `extraction_types` — per-doc-type **templates** + `field_schema` (drives field-typed scoring); selectable in the extraction tab.
+- `prompts` — prompt library `{task, extraction_type_id?, name, version, text}`; a run references one via `runs.prompt_id`.
 - `gt_items` — **one row per (dataset, task, doc_id)**; the coverage gate reads these.
+- `runs.enabled_classes_json` — classification: **frozen snapshot** of the classes the run's model was
+  enabled/trained for (from its profile). Disabled = current `class_taxonomy` − snapshot, so a grown
+  master list is measured against exactly what each old run covered. `runs.prompt_id` links the prompt.
 - `runs` — one leaderboard row. Identity: `run_key` (UNIQUE, `<semantic>-<rand6>`), renameable
   `display_name`. Provenance: `origin` (ui|wandb|api), `external_ref` (+UNIQUE index → no double
   ingest), `gt_fingerprint`. Coverage: `coverage_status` (full|partial|manual), `coverage_missing`.
@@ -135,8 +147,8 @@ Normalizers live in `server/scoring/util.js`:
 
 | Task | Headline | Also | Notes |
 |---|---|---|---|
-| classification | `accuracy` | macro-F1, per-class P/R/F1, out-of-scope count | labels normalized via `normalizeLabel`; profile scopes to a class subset |
-| extraction | `field_accuracy` | `doc_exact_match`, per-field acc | field-typed via `extraction_types.field_schema`; falls back to string if none |
+| classification | `accuracy` | macro-F1, per-class **P/R/F1 + support**, confusion, out-of-scope count | labels via `normalizeLabel`; profile scopes to enabled subset; drill-down shows **enabled vs disabled** vs master |
+| extraction | `field_accuracy` (micro) | `macro_field_accuracy`, `char_similarity`, `doc_exact_match`, per-field **acc + support** | field-typed via the chosen **template**'s `field_schema`; **macro** = mean of per-field acc, **micro** = pooled instances; char-sim = normalized Levenshtein |
 | segmentation | `boundary_recall` | F1, precision, `missed_boundaries`, `spurious_boundaries`, `page_class_accuracy`, exact-match | per-page `start`/`continue`+`class`; **recall-first: a missed start = two docs merged** (chaitu). Event-sourced → the row drop-down renders confusion matrix, per-class/bucket, segment-length, over/under-seg, worst-docs, error taxonomy, transitions w/ examples, confidence |
 | segregation | `ari` | purity, #groups | partition agreement (label values don't need to match, only co-membership) |
 
@@ -147,7 +159,10 @@ Normalizers live in `server/scoring/util.js`:
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/login` · `/api/logout` | session in/out; `GET /api/me` returns current user + auth-configured |
-| GET | `/api/tasks` · `/api/models` | reference data; models include their card |
+| GET | `/api/tasks` · `/api/models` · `/api/classes` | reference data; models include their card |
+| GET/POST | `/api/classifier-profiles` | list / create enabled-class subsets (classification) |
+| GET/POST | `/api/extraction-types` | list / create doc-type templates (extraction) |
+| GET/POST/DELETE | `/api/prompts` | prompt library (filter by task / extraction_type_id) |
 | GET/POST | `/api/datasets` | list / create datasets |
 | POST/GET | `/api/datasets/:id/gt` | upload GT per task / get per-task GT counts |
 | POST | `/api/runs` | **score a predictions file** (coverage gate; 422 + missing list, `override` to score subset) |
@@ -182,6 +197,18 @@ Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomp
   UNIQUE index so an auto-ingested source run can't be logged twice.
 - **`normalizeLabel` (not full `normalizeText`) for class codes** — lowercasing/trim fixes real
   casing/whitespace mismatches without mangling controlled codes.
+- **Classification/extraction re-use `item_results` as their atomic layer** (no new event tables).
+  Classification rows hold pred/gold class; extraction `detail_json` holds `{field:{pred,gold,ok}}`.
+  Per-class confusion, field-wise support, macro/micro and char-similarity all **derive** in the
+  aggregators — so char-sim (added after the fact) re-aggregates over old runs with no re-score.
+- **Enabled classes are a frozen per-run snapshot, not a live profile FK.** The master list grows;
+  judging an old benchmark against classes it never covered would be wrong. `enabled_classes_json`
+  freezes the profile's classes at score time; disabled = current master − snapshot.
+- **Macro vs micro are both reported for extraction.** Micro (pooled field instances) is the headline;
+  macro (each field equal) surfaces uneven per-field difficulty, which support counts explain (a field
+  in 3/20 docs shouldn't dominate). Char-similarity is a separate "how close" signal from typed match.
+- **Prompts are first-class + versioned in-app** so a leaderboard row records exactly the prompt (and
+  dataset + template) it used — reproducibility, not just a number.
 - **Segmentation is per-page + recall-first.** A bundle is an ordered page list, each page tagged
   `start`/`continue` with its `class` (grouped form of the pipeline's per-page JSONL). A boundary is
   an internal `start`; missing one silently **merges** two docs → recall is the headline.
@@ -216,6 +243,12 @@ Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomp
   no migration needed. The UI renders whatever `overall`-scope keys come back.
 - **Add a model** → edit `models.json`, re-run `npm run db:init` (upserts; never delete an `id` that
   runs reference).
+- **Load the taxonomies** (when chaitu shares them) → `node scripts/import-classes.js <file>` and
+  `node scripts/import-extraction-types.js <file>` (idempotent upserts; formats are tolerant — see the
+  file headers). Then `reaggregate` old classification runs to show enabled-vs-(grown-)master.
+- **Add a classification/extraction analysis view** → add a derivation to `class_aggregate.js` /
+  `extraction_aggregate.js` (pure over `item_results`) and render it in `app.js`; old runs pick it up
+  via `reaggregate`, no re-score.
 - **doc_id must be identical** across GT and every predictions file for a dataset — it's the join key
   and what the coverage gate checks. chaitu defines the doc_id scheme.
 - **Starter credential** used in dev/smoke: `chaitu` / `changeme-artha` — change it before deploying.

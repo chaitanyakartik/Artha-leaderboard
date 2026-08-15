@@ -1,64 +1,46 @@
-// Classification scorer.
-// pred:  doc_id -> class code (string) | { class|label|predicted, confidence? }
-// gt:    doc_id -> class code (string) | { class|label }
-// opts.profileClasses: optional array of class codes the classifier was trained for.
-//   When given, metrics are SCOPED to docs whose true class is in that subset.
-import { prf, round, normalizeLabel } from './util.js';
+// Classification scorer — stores one atomic row per doc; all breakdowns derive in class_aggregate.js.
+// pred/gt: doc_id -> class code (string) | { class|label|predicted, confidence? }
+// opts.profileClasses: the classes this run's model was enabled/trained for (the enabled snapshot).
+//   When given, metrics are SCOPED to docs whose true class is in that subset; out-of-scope docs are
+//   kept as items (flagged in_scope:false) so the aggregator can still count them.
+// opts.master: the full class taxonomy (for enabled-vs-disabled).
+import { normalizeLabel } from './util.js';
+import { aggregate } from './class_aggregate.js';
 
-// Extract the class label from a value, then normalize (lowercase + trim, codes intact)
-// so "Aadhaar" / "aadhaar" / "aadhaar " all compare equal.
 const cls = (v) => {
   if (v == null) return null;
   const raw = typeof v === 'object' ? (v.class ?? v.label ?? v.predicted ?? null) : v;
   return raw == null ? null : normalizeLabel(raw);
 };
 
-export function score(pred, gt, { profileClasses } = {}) {
+export function score(pred, gt, opts = {}) {
+  const { profileClasses } = opts;
   const scope = profileClasses && profileClasses.length ? new Set(profileClasses.map(normalizeLabel)) : null;
-  const stats = new Map(); // label -> {tp, fp, fn}
-  const bump = (label, k) => {
-    if (!stats.has(label)) stats.set(label, { tp: 0, fp: 0, fn: 0 });
-    stats.get(label)[k]++;
-  };
 
   const items = [];
-  let n = 0, correct = 0, skipped = 0;
-
   for (const doc of Object.keys(gt)) {
     const truth = cls(gt[doc]);
     if (truth == null) continue;
-    const t = String(truth);
-    if (scope && !scope.has(t)) { skipped++; continue; }
-
+    const inScope = !scope || scope.has(String(truth));
     const p = cls(pred[doc]);
-    const pc = p == null ? null : String(p);
-    const ok = pc === t;
-    n++; if (ok) correct++;
-
-    if (ok) bump(t, 'tp');
-    else { bump(t, 'fn'); if (pc != null) bump(pc, 'fp'); }
-
+    const correct = inScope ? (p === truth ? 1 : 0) : null;
     items.push({
       doc_id: doc,
-      predicted_json: JSON.stringify(pc),
-      gold_json: JSON.stringify(t),
-      correct: ok ? 1 : 0,
-      detail_json: null,
+      predicted_json: JSON.stringify(p),
+      gold_json: JSON.stringify(String(truth)),
+      correct,
+      detail_json: JSON.stringify({ in_scope: inScope }),
     });
   }
 
-  const labels = [...stats.keys()];
-  const perClass = labels.map((l) => ({ label: l, ...prf(stats.get(l).tp, stats.get(l).fp, stats.get(l).fn) }));
-  const macroF1 = labels.length ? round(perClass.reduce((s, c) => s + c.f1, 0) / labels.length) : 0;
-  const accuracy = n ? round(correct / n) : 0;
-
+  const analysis = aggregate(items, { master: opts.master || [], enabled: profileClasses || null });
   const metrics = [
-    { key: 'accuracy', value: accuracy, scope: 'overall' },
-    { key: 'macro_f1', value: macroF1, scope: 'overall' },
-    { key: 'n_scored', value: n, scope: 'overall' },
-    { key: 'n_out_of_scope', value: skipped, scope: 'overall' },
+    { key: 'accuracy', value: analysis.accuracy, scope: 'overall' },
+    { key: 'macro_f1', value: analysis.macro_f1, scope: 'overall' },
+    { key: 'n_scored', value: analysis.overview.n_scored, scope: 'overall' },
+    { key: 'n_out_of_scope', value: analysis.overview.n_out_of_scope, scope: 'overall' },
   ];
-  for (const c of perClass) metrics.push({ key: `class:${c.label}:f1`, value: c.f1, scope: 'per_class' });
+  for (const c of analysis.per_class) metrics.push({ key: `class:${c.class}:f1`, value: c.f1, scope: 'per_class' });
 
-  return { headline: { key: 'accuracy', value: accuracy }, metrics, items };
+  return { headline: { key: 'accuracy', value: analysis.accuracy }, metrics, items, analysis };
 }

@@ -62,6 +62,7 @@ tr.detail td { padding:0; border-bottom:1px solid var(--line); white-space:norma
 .misses th, .misses td { padding:5px 8px; white-space:normal; }
 .muted { color:var(--mut); }
 .muted code { background:#171a21; }
+.rowsub { font-size:11px; color:var(--mut); margin-top:2px; }
 .drawer-tools { margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .drawer-tools .reagg { font-size:12px; padding:4px 9px; }
 .sec { border:1px solid var(--line); border-radius:6px; margin:8px 0; background:#0e1015; }

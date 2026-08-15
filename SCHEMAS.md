@@ -29,8 +29,8 @@ GT must be present here, or the run is rejected (422 + missing list) unless `ove
 
 | Task | `<gold>` / `<prediction>` | Scored by |
 |---|---|---|
-| **classification** | class code string, or `{ "class": "...", "confidence": 0.9 }` | label match (lowercase+trim, codes kept intact) |
-| **extraction** | `{ "<field>": <value>, ... }` | field-typed match (string/number/amount/date) |
+| **classification** | class code string, or `{ "class": "...", "confidence": 0.9 }` | label match (lowercase+trim); scoped to the run's **enabled** classes (a profile); per-class P/R/F1 + confusion |
+| **extraction** | `{ "<field>": <value>, ... }` | field-typed match; per-field **support** + accuracy, **macro & micro** averages, **char-similarity**, doc-exact |
 | **segmentation** | ordered page list: `[{ "page":n, "tag":"start"\|"continue", "class":"..." }, ...]` | boundary **recall** (headline), F1, precision, page-class acc + **popular-misses** analysis |
 | **segregation** | group id (applicant id) string/number | partition agreement — ARI + purity |
 
@@ -85,6 +85,38 @@ When an **extraction type** is registered with a `field_schema`, each field is m
 
 Without a registered schema, all fields fall back to `string` matching. Register schemas to get
 true "real accuracy" on dates/amounts.
+
+**Support & macro/micro.** A field is only scored on docs where it's present in the GT — its
+**support** is that count (a field may appear in 5 of 20 docs). **Micro** field-accuracy pools all
+field instances (frequent fields dominate); **macro** averages the per-field accuracies (each field
+equal). They diverge when per-field difficulty is uneven — read both. **Char-similarity** is
+`1 − levenshtein(normText(pred), normText(gold)) / maxlen`, reported micro + macro — a "how close"
+signal distinct from the typed match.
+
+### Classification enabled classes
+A run is scored against the **enabled** classes of the classifier **profile** you attach (a named
+subset of the master taxonomy). GT docs whose true class is outside the profile are counted as
+out-of-scope, not wrong. The enabled set is **snapshotted onto the run**, so as the master list grows
+the drill-down still shows this run's `enabled N / master M` and the disabled remainder.
+
+## Prompt & taxonomy files (stored in-app / imported)
+
+**Prompt** (stored via `POST /api/prompts`, full text kept in-app):
+```jsonc
+{ "task": "classification", "extraction_type_id": null,   // set for extraction (per-template)
+  "name": "cls-v3", "version": "2026-08-15", "text": "You are a document classifier. ..." }
+```
+A run references one prompt (`prompt_id`); the leaderboard row shows its name + version.
+
+**Master class taxonomy** (`node scripts/import-classes.js <file>`) — tolerant input:
+```jsonc
+[ { "code": "aadhaar", "label": "Aadhaar", "bucket": "KYC" }, ... ]  // or ["aadhaar", ...] or {code:label}
+```
+**Extraction taxonomy** (`node scripts/import-extraction-types.js <file>`):
+```jsonc
+[ { "name": "rent_agreement",
+    "fields": [ { "name": "tenant_name", "type": "string" }, { "name": "monthly_rent", "type": "amount" } ] } ]
+```
 
 ---
 

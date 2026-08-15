@@ -56,6 +56,21 @@ CREATE TABLE IF NOT EXISTS extraction_types (
   notes        TEXT
 );
 
+-- Prompt library. classification/segmentation keep a list (extraction_type_id NULL); extraction
+-- keeps a list per type (extraction_type_id set) or a single global one. Full text stored in-app +
+-- versioned, so a leaderboard run can reference exactly the prompt it used.
+CREATE TABLE IF NOT EXISTS prompts (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  task               TEXT NOT NULL REFERENCES tasks(slug),
+  extraction_type_id INTEGER REFERENCES extraction_types(id) ON DELETE SET NULL, -- extraction only
+  name               TEXT NOT NULL,
+  version            TEXT,                    -- free-form (e.g. "v3", "2026-08-15")
+  text               TEXT NOT NULL,           -- the actual prompt
+  notes              TEXT,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_prompts_task ON prompts(task, extraction_type_id);
+
 -- Ground truth, one row per (dataset, task, doc_id). The coverage gate reads these.
 CREATE TABLE IF NOT EXISTS gt_items (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,6 +100,8 @@ CREATE TABLE IF NOT EXISTS runs (
   external_ref          TEXT,                -- provenance + dedup for auto-ingest (e.g. wandb run path)
   gt_fingerprint        TEXT,                -- GT hash at scoring time (auto-ingest "GT matches" check)
   analysis_json         TEXT,                -- rich per-run analysis (e.g. segmentation "popular misses"); drives the run drill-down
+  prompt_id             INTEGER REFERENCES prompts(id),        -- the prompt this run used
+  enabled_classes_json  TEXT,                -- classification: frozen snapshot of the classes the model was enabled/trained for
   notes                 TEXT,
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
