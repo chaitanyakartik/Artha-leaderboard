@@ -1,36 +1,204 @@
-# artha_leaderboard — repo notes
+# artha_leaderboard — project guide
 
-Validation leaderboard for Artha/DocAI. **The app is the scorer**: upload a predictions JSON for
-a model config, it scores against stored ground truth and puts the row on the board. Full design:
-`PLAN.md`. Origin dump: Second Brain `raw/2026-08-14-validation-revamp-jiocare-artha-dump.md`.
+Validation leaderboard for Artha / DocAI. **The app is the scorer**: you upload a predictions
+JSON for a model config, it scores against stored ground truth, and the row lands on the board.
+One place to answer *"which model config wins, on which task, on which dataset."*
 
-## Run it
-```
+- Origin: Second Brain `raw/2026-08-14-validation-revamp-jiocare-artha-dump.md`; tracked in
+  `work/artha/artha-validation.md`. Part of chaitu's "deployment" track of the validation revamp.
+- Companion docs in this repo: **`PLAN.md`** (design + phasing), **`SCHEMAS.md`** (file contracts).
+  This file is the authoritative status + architecture + decisions doc — start here.
+
+---
+
+## 1. Status at a glance
+
+| Area | State |
+|---|---|
+| Backend API (Fastify + SQLite) | ✅ working |
+| Login gate (scrypt + signed cookie) | ✅ working |
+| Coverage gate (GT-completeness before scoring) | ✅ working |
+| Classification scorer | ✅ solid (normalized labels) |
+| Extraction scorer (field-typed) | ✅ solid |
+| Segmentation scorer | 🟡 works; **schema is a working assumption**, recall-first |
+| Segregation scorer | 🟡 works; applicant-grouping confirmed, metrics are standard |
+| Run identity (semantic name + random dedup id) | ✅ working |
+| Model registry + model cards | ✅ working |
+| W&B auto-ingest | 🔴 scaffolded, gated OFF, unimplemented |
+| Frontend (4-tab board, upload, manual) | ✅ working, no-build vanilla JS |
+| Deploy on the VM / phone access | ❌ not done — runs on localhost only |
+| Per-doc error drill-down UI | ❌ not built (API returns items; no UI) |
+| classifier-profile / extraction-type CRUD UI | ❌ not built (tables + scoring hooks exist; seed via SQL) |
+| Separate "runs" tab | ❌ deferred by chaitu ("we'll see later") |
+| Tests | ❌ none (only `samples/smoke.sh`) |
+
+### Done
+- Full REST API; SQLite schema + idempotent init/migrations; model registry synced from `models.json`.
+- Four task scorers, coverage gate, upload + manual entry, leaderboard read, per-run detail API.
+- Auth: single credential in `.env`, scrypt-hashed password, HMAC-signed session cookie, login page.
+- Run identity/dedup, model cards, unified `createRun()` core, W&B scaffold.
+
+### Pending / next
+- **Deploy on the VM + reach it from the phone over Tailscale** — the remaining half of the
+  original "tonight" target; highest real-world value.
+- Confirm the **segmentation schema** (chaitu to supply) and re-check segregation semantics on real data.
+- Per-doc **error drill-down** UI (the audit-vs-source loop); CRUD for classifier profiles / extraction types.
+- Enable **W&B auto-ingest** when the training→eval loop is ready.
+- Tests; the React + "Impeccable" UI pass (P5).
+
+---
+
+## 2. Run it
+
+```bash
 npm install
-npm run db:init        # apply schema, seed 4 tasks, sync models.json -> DB
-npm run dev            # http://0.0.0.0:5173  (PORT=xxxx to override)
+npm run db:init                          # apply schema, seed 4 tasks, sync models.json -> DB
+node scripts/set-password.js <user> <pw> # set the login credential (writes .env)
+npm run dev                              # http://0.0.0.0:5173  (PORT=xxxx to override)
+bash samples/smoke.sh <port>             # end-to-end sanity check
 ```
-DB is a SQLite file at `data/artha.sqlite` (gitignored). `npm run db:init` is idempotent.
+- DB is a SQLite file at `data/artha.sqlite` (gitignored, WAL mode). `db:init` is idempotent and
+  runs column migrations for older DBs.
+- If **no credential is set**, the app runs **open** (dev convenience). Set one to enable the gate.
 
-## Shape
-- `server/index.js` — Fastify API + serves `public/`.
-- `server/scoring/<task>.js` — one scorer per task; `scoring/index.js` dispatches + holds the
-  **coverage gate** (`checkCoverage`). Add a task-metric by editing its scorer only.
-- `server/db/schema.sql` + `seed.sql`, `server/db/init.js` — schema/seed/registry sync.
-- `models.json` (root) — **canonical model registry**. Add configs here, re-run `db:init`. Runs
-  reference `model_configs.id` (a stable slug), so names can't collide.
-- `public/` — no-build vanilla-JS UI (4 tabs). P5 replaces this with React + Impeccable.
-- `samples/` — example GT + prediction files to exercise the loop.
+---
 
-## Core rule: the coverage gate
-Every GT `doc_id` for a `(dataset, task)` must have a prediction, or `POST /api/runs` returns 422
-with the missing list. Pass `override:true` to score the covered subset (row flagged `partial`).
+## 3. Architecture
 
-## Status / not done yet
-- **Classification + extraction scorers are solid.** **Segmentation + segregation metrics are
-  DRAFT** — semantics (what a "segment" / "group" is) unconfirmed; see the `[semantics DRAFT]`
-  headers in those files.
-- No auth, no tests yet. classifier_profiles / extraction_types have tables + scoring hooks but
-  no CRUD UI (create via SQL for now).
-- Deploy target: one node process on the VM, reached over Tailscale (phone-drivable).
-- Next: P2 per-doc error drill-down; P4 auto-ingest from Madhav's val pipeline + W&B auto-log.
+```
+models.json            canonical model registry + model cards (verified ids)
+server/
+  index.js             Fastify app: auth gate, all routes, serves public/
+  config.js            tiny .env loader (no dep) + config flags
+  auth.js              scrypt password hash/verify + HMAC session cookie
+  db.js                sqlite handle, paths (data/, uploads/)
+  naming.js            semantic run name + random dedup id (run_key)
+  runs.js              createRun(): the ONE run-creation core (upload | manual | ingest)
+  ingest/wandb.js      W&B auto-ingest scaffold (gated off)
+  db/
+    schema.sql         full data model
+    seed.sql           the 4 fixed tasks
+    init.js            apply schema/seed + migrations + sync models.json
+  scoring/
+    index.js           dispatch + checkCoverage() (the coverage gate)
+    util.js            normalizers (text/label/number/date) + P/R/F1 helpers
+    classification.js  accuracy, macro-F1, per-class F1, profile-subset scoping
+    extraction.js      field-typed match, per-field + per-doc accuracy
+    segmentation.js    boundary recall (headline) / F1 / exact-match
+    segregation.js     Adjusted Rand Index + purity (partition agreement)
+public/                no-build vanilla-JS UI: index.html, app.js, style.css, login.html
+scripts/set-password.js  set/reset the login credential
+samples/               example GT + prediction files, smoke.sh
+```
+
+**Request path:** `onRequest` auth hook → route → (for runs) `createRun()` → per-task scorer →
+SQLite. Everything that creates a leaderboard row goes through `createRun()`, so identity, dedup,
+coverage and scoring are consistent across the UI, manual entry, and future W&B ingest.
+
+---
+
+## 4. Data model (SQLite — `server/db/schema.sql`)
+
+- `tasks` — the 4 fixed tasks (segmentation, classification, extraction, segregation).
+- `datasets` — `{name, n_applicants, n_docs, source_manifest, notes}`; e.g. V1 = 5 applicants × 50 docs.
+- `model_configs` — registry; **`id` is a stable slug (PK)**, `card_json` holds the model card.
+- `class_taxonomy` (the 140 classes), `classifier_profiles` + `profile_classes` — which subset a
+  classifier was trained for (classification scoping).
+- `extraction_types` — per-doc-type variants + `field_schema` (drives field-typed scoring).
+- `gt_items` — **one row per (dataset, task, doc_id)**; the coverage gate reads these.
+- `runs` — one leaderboard row. Identity: `run_key` (UNIQUE, `<semantic>-<rand6>`), renameable
+  `display_name`. Provenance: `origin` (ui|wandb|api), `external_ref` (+UNIQUE index → no double
+  ingest), `gt_fingerprint`. Coverage: `coverage_status` (full|partial|manual), `coverage_missing`.
+- `run_metrics` — flexible `{run_id, key, value, scope}` (metrics differ per task).
+- `item_results` — per-doc predicted-vs-gold for drill-down.
+
+---
+
+## 5. Metrics per task (and normalization)
+
+Normalizers live in `server/scoring/util.js`:
+- **`normalizeText`** — lowercase, NFKC, collapse whitespace, strip punctuation. For free-text fields.
+- **`normalizeLabel`** — lowercase, NFKC, collapse whitespace, trim, **no punctuation stripping**.
+  For controlled vocab (class codes, group ids) so `bank_statement` / `form-16` survive intact.
+- **`normalizeNumber`** — strip non-numeric → numeric compare (`"Rs 12,500"` == `12500`).
+- **`normalizeDate`** — parse to `YYYY-MM-DD` (`"12/05/1990"` == `"1990-05-12"`).
+
+| Task | Headline | Also | Notes |
+|---|---|---|---|
+| classification | `accuracy` | macro-F1, per-class P/R/F1, out-of-scope count | labels normalized via `normalizeLabel`; profile scopes to a class subset |
+| extraction | `field_accuracy` | `doc_exact_match`, per-field acc | field-typed via `extraction_types.field_schema`; falls back to string if none |
+| segmentation | `boundary_recall` | F1, precision, `missed_boundaries`, exact-match | **recall-first: a missed start page is the costly error** (chaitu) |
+| segregation | `ari` | purity, #groups | partition agreement (label values don't need to match, only co-membership) |
+
+---
+
+## 6. API surface
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/login` · `/api/logout` | session in/out; `GET /api/me` returns current user + auth-configured |
+| GET | `/api/tasks` · `/api/models` | reference data; models include their card |
+| GET/POST | `/api/datasets` | list / create datasets |
+| POST/GET | `/api/datasets/:id/gt` | upload GT per task / get per-task GT counts |
+| POST | `/api/runs` | **score a predictions file** (coverage gate; 422 + missing list, `override` to score subset) |
+| POST | `/api/runs/manual` | add a row by typing metrics (no scoring) |
+| PATCH | `/api/runs/:id` | rename a run's `display_name` |
+| GET | `/api/leaderboard?task=&dataset_id=` | the board rows + overall metrics |
+| GET/DELETE | `/api/runs/:id` | full run detail (incl. item_results) / delete |
+| POST | `/api/ingest/wandb` | W&B auto-ingest — **501 until `ARTHA_WANDB_INGEST=on`** |
+
+Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomplete`→422,
+`duplicate_external`→409, `gt_mismatch`→409).
+
+---
+
+## 7. Design decisions (and why)
+
+- **The app scores; it isn't a passive display.** Upload predictions → it computes metrics against
+  stored GT. This is the core inversion vs a spreadsheet of numbers someone else produced.
+- **Coverage gate is mandatory.** No fair cross-config comparison unless every config covered the
+  same GT docs. Incomplete files are blocked (422 + the missing list); `override` scores the covered
+  subset and flags the row `partial` — never silently.
+- **Backend is Node, single language** (chaitu's pick) — over reusing the existing Python scoring.
+  Metrics are plain JS; no heavy deps. Whole backend: Fastify + `better-sqlite3`.
+- **`models.json` is the canonical registry.** Runs reference `model_configs.id` (a stable slug),
+  so model names can't collide or duplicate — dedup enforced at PK + a `seen`-check on sync.
+- **One `createRun()` core** for UI upload / manual / ingest. Keeps identity, dedup, coverage and
+  scoring identical everywhere and makes the W&B scaffold thin.
+- **Run identity = semantic name + random suffix.** `run_key` is `<task-dataset-model-time>-<rand6>`
+  (UNIQUE) so repeated scorings never clash; `display_name` is renameable. `external_ref` has a
+  UNIQUE index so an auto-ingested source run can't be logged twice.
+- **`normalizeLabel` (not full `normalizeText`) for class codes** — lowercasing/trim fixes real
+  casing/whitespace mismatches without mangling controlled codes.
+- **Segmentation is recall-first** — missing a true start page is the error that matters; the
+  page-range model is a working assumption until chaitu supplies the final schema.
+- **Auth is deliberately minimal** — one credential in `.env`, scrypt-hashed, HMAC-signed cookie,
+  no user table, no dependency. Enough to gate a phone-reachable internal tool; not a multi-user system.
+- **No-build frontend on purpose** — vanilla JS so it runs on the VM/phone immediately. The React +
+  "Impeccable" UI pass is deferred (P5) and shouldn't block the scoring loop.
+
+---
+
+## 8. Roadmap / phasing
+
+- **P1 (done)** — API, 4 scorers, coverage gate, minimal UI, login, run identity, model cards.
+- **P2 (next)** — deploy on the VM + phone access; per-doc error drill-down; profile/type CRUD UI.
+- **P3** — lock segmentation/segregation semantics on real data; extraction field-schema editor.
+- **P4** — **W&B auto-log**: training run finishes → final eval POSTed → GT-fingerprint match →
+  auto-create run (`origin:wandb`, renameable). Scaffold is in `server/ingest/wandb.js`.
+- **P5** — React + Impeccable UI refinement.
+
+---
+
+## 9. Gotchas / notes for future edits
+
+- **Add a metric** → edit only that task's `scoring/<task>.js`; `run_metrics` is schema-flexible, so
+  no migration needed. The UI renders whatever `overall`-scope keys come back.
+- **Add a model** → edit `models.json`, re-run `npm run db:init` (upserts; never delete an `id` that
+  runs reference).
+- **doc_id must be identical** across GT and every predictions file for a dataset — it's the join key
+  and what the coverage gate checks. chaitu defines the doc_id scheme.
+- **Starter credential** used in dev/smoke: `chaitu` / `changeme-artha` — change it before deploying.
+- `.env` is gitignored; only `.env.example` is tracked. `data/` (DB + uploads) is fully gitignored.
+- Two DRAFT scorers carry `[semantics]`/`NOTE` headers in-file — read them before trusting those
+  numbers on real data.

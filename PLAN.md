@@ -59,18 +59,25 @@ Two ways to add a row:
 ## Stack
 
 - **Backend:** Node + Fastify + `better-sqlite3`. Scoring in `server/scoring/<task>.js`.
-- **Frontend:** Vite + React + Tailwind (Impeccable-friendly for later UI refinement).
+- **Frontend (now):** no-build vanilla JS (runs on the VM/phone immediately). **P5** swaps in
+  React + Tailwind + Impeccable.
 - **DB:** SQLite file.
 - **Deploy:** one process on the VM, reached over Tailscale -> drivable from the phone.
 
-## Phasing
+## Phasing  (live status lives in CLAUDE.md §1)
 
-- **P1 (scaffold, current):** repo + schema + seed + API + GT upload + coverage gate +
-  **classification scorer end-to-end** + minimal 4-tab UI. Prove the loop on the phone.
-- **P2:** extraction scorer (reuse field-typed methodology) + per-doc error drill-down.
-- **P3:** segmentation + segregation scorers + extraction-types / classifier-profile UI.
-- **P4:** auto-ingestion (Madhav's val pipeline POSTs results) -> W&B auto-log on training runs.
+- **P1 — DONE:** repo, schema, seed, API, GT upload + coverage gate, **all four scorers**, minimal
+  4-tab UI, login gate, run identity/dedup, model cards, W&B ingest scaffold (gated off).
+- **P2 — next:** deploy on the VM + phone access; per-doc error drill-down; classifier-profile /
+  extraction-type CRUD UI.
+- **P3:** lock segmentation + segregation semantics on real data; extraction field-schema editor.
+- **P4:** auto-ingestion (Madhav's val pipeline POSTs results) -> **W&B auto-log** on training runs
+  (scaffold in `server/ingest/wandb.js`).
 - **P5:** UI refinement with Impeccable.
+
+> Note: classification + extraction scorers landed together in P1 (not staged as originally
+> drafted below). Segmentation + segregation are implemented but their metric **semantics** are a
+> working assumption pending real data — see CLAUDE.md §1.
 
 ## Data model (SQLite)
 
