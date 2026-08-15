@@ -70,7 +70,8 @@ Two ways to add a row:
   4-tab UI, login gate, run identity/dedup, model cards, W&B ingest scaffold (gated off).
 - **P2 — next:** deploy on the VM + phone access; per-doc error drill-down; classifier-profile /
   extraction-type CRUD UI.
-- **P3:** lock segmentation + segregation semantics on real data; extraction field-schema editor.
+- **P3:** run-to-run **regression comparison** (cheap: diff aggregates over the shared `analysis_events`);
+  lock segregation semantics on real data; extraction field-schema editor.
 - **P4:** auto-ingestion (Madhav's val pipeline POSTs results) -> **W&B auto-log** on training runs
   (scaffold in `server/ingest/wandb.js`).
 - **P5:** UI refinement with Impeccable.
@@ -94,4 +95,7 @@ runs                {task, dataset_id, model_config_id, extraction_type_id?, cla
                      predictions_path, coverage_status, created_at, notes}
 run_metrics         {run_id, key, value, scope}
 item_results        {run_id, doc_id, predicted_json, gold_json, correct, detail_json}  <- drill-down
+analysis_events     {run_id, doc_id, page, gt/pred tag+class+seg_class, gt/pred_boundary,
+                     error_type, confidence, prev_gt_class}  <- durable atomic layer; all
+                     segmentation analysis views re-aggregate from here (no re-score)
 ```

@@ -63,10 +63,15 @@ with its document `class`. This is the grouped form of the per-page **JSONL** th
 - **Metrics:** boundary **recall** is the headline (a missed start silently merges two docs — the
   costly error), plus precision/F1, `missed_boundaries`, `spurious_boundaries`, `page_class_accuracy`,
   `exact_match`.
-- **Detailed analysis** (per run, shown as the row drop-down): the *popular misses* — which
-  `class → class` boundaries get **merged** (missed) or **split** (spurious) most often, page-level
-  class confusion, and a `bucket → bucket` rollup (KYC / PKYC / ITR / financial / property / rental /
-  … — populated once the class taxonomy's `bucket` column is filled; empty until then).
+- Optional per-page `confidence` (aliases: `conf`, `prob`, `score`) feeds the confidence analysis.
+- **Detailed analysis** (per run, the row drop-down) is **event-sourced**: the scorer stores one
+  atomic event per page (`analysis_events`), and every view is a re-aggregation over them —
+  boundary metrics, confusion matrix, per-class & per-bucket performance, segment-length (GT vs
+  predicted), over/under-segmentation, worst documents, error taxonomy (`missed_start` /
+  `false_start` / `wrong_class`), `class→class` merges/splits **with example docs**, and confidence.
+  Because views derive from stored events, a new view — or a newly-filled `class_taxonomy.bucket`
+  map (KYC / PKYC / ITR / financial / property / rental / …) — is applied to old runs via
+  `POST /api/runs/:id/reaggregate`, **no re-scoring**. Buckets are `NULL` until the map is populated.
 Segregation GT / prediction (each doc -> its applicant):
 ```json
 { "doc_a": "appl1", "doc_b": "appl1", "doc_c": "appl2" }

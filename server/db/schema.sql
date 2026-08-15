@@ -111,6 +111,30 @@ CREATE TABLE IF NOT EXISTS item_results (
   detail_json    TEXT                        -- per-field breakdown etc.
 );
 
+-- Atomic per-page error events (segmentation). The DURABLE layer: every analysis view
+-- (confusion matrix, per-class, segment length, worst docs, ...) is a re-aggregation over
+-- these, so a new view invented later never requires re-scoring. See scoring/seg_aggregate.js.
+CREATE TABLE IF NOT EXISTS analysis_events (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id         INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  doc_id         TEXT NOT NULL,
+  page           INTEGER,
+  gt_tag         TEXT,           -- start | continue
+  pred_tag       TEXT,
+  gt_class       TEXT,
+  pred_class     TEXT,
+  gt_seg_class   TEXT,           -- class of the segment (doc) this page belongs to
+  pred_seg_class TEXT,
+  gt_bucket      TEXT,           -- coarse bucket (KYC/ITR/...) — NULL until the map is populated
+  pred_bucket    TEXT,
+  gt_boundary    INTEGER,        -- 1 if an internal GT start (a true boundary)
+  pred_boundary  INTEGER,
+  error_type     TEXT,           -- NULL | missed_start | false_start | wrong_class
+  confidence     REAL,           -- model confidence for this page, if emitted
+  prev_gt_class  TEXT            -- class of the preceding segment (for transition analysis)
+);
+CREATE INDEX IF NOT EXISTS idx_events_run ON analysis_events(run_id);
+
 CREATE INDEX IF NOT EXISTS idx_gt_dataset_task ON gt_items(dataset_id, task);
 CREATE INDEX IF NOT EXISTS idx_runs_task_dataset ON runs(task, dataset_id);
 CREATE INDEX IF NOT EXISTS idx_item_results_run ON item_results(run_id);

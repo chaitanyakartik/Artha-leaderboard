@@ -198,55 +198,130 @@ async function toggleDetail(btn) {
   try {
     const run = await api(`/api/runs/${id}`);
     cell.innerHTML = `<div class="drawer">${renderDetail(run)}</div>`;
+    bindDrawer(cell, id);
   } catch (e) { cell.innerHTML = `<div class="drawer err">${e.message}</div>`; }
 }
 
-function pairTable(title, rows, kind) {
+function bindDrawer(cell, id) {
+  const btn = cell.querySelector('.reagg');
+  if (!btn) return;
+  btn.onclick = async () => {
+    btn.textContent = '↻ re-aggregating…'; btn.disabled = true;
+    try {
+      const res = await api(`/api/runs/${id}/reaggregate`, { method: 'POST' });
+      cell.innerHTML = `<div class="drawer">${renderDetail({ id, analysis: res.analysis })}</div>`;
+      bindDrawer(cell, id);
+    } catch (e) { btn.textContent = `failed: ${e.message}`; }
+  };
+}
+
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+function section(title, inner) { return inner ? `<details class="sec" open><summary>${title}</summary><div class="secbody">${inner}</div></details>` : ''; }
+
+// class -> class transition table, with hover examples
+function transitionTable(rows, verb) {
   if (!rows || !rows.length) return '';
-  const verb = kind === 'merge' ? 'merged' : kind === 'split' ? 'split' : 'seen as';
   const body = rows.slice(0, 20).map((p) => {
-    const b = (p.from_bucket || p.to_bucket) ? ` <span class="muted">[${p.from_bucket || '?'}→${p.to_bucket || '?'}]</span>` : '';
-    return `<tr><td><code>${p.from}</code> → <code>${p.to}</code>${b}</td><td class="num">${p.count}</td></tr>`;
+    const ex = (p.examples || []).map((e) => `${e.doc_id} p${e.page}`).join('; ');
+    const t = ex ? ` title="e.g. ${esc(ex)}"` : '';
+    return `<tr${t}><td><code>${esc(p.from)}</code> → <code>${esc(p.to)}</code></td><td class="num">${p.count}</td></tr>`;
   }).join('');
-  return `<div class="misses"><h4>${title}</h4><table><thead><tr><th>${verb} (class → class)</th><th>count</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  return `<div class="misses"><h4>${verb}</h4><table><tbody>${body}</tbody></table></div>`;
+}
+function kvTable(headers, rows) {
+  const th = headers.map((h) => `<th>${h}</th>`).join('');
+  const tb = rows.map((r) => `<tr>${r.map((c, i) => `<td class="${i ? 'num' : ''}">${c ?? '—'}</td>`).join('')}</tr>`).join('');
+  return `<table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table>`;
+}
+
+function confusionMatrix(cm) {
+  if (!cm || !cm.labels || cm.labels.length < 2) return '';
+  // keep it readable: top classes by GT page volume
+  const vol = {};
+  for (const [k, v] of Object.entries(cm.cells)) { const g = k.split('||')[0]; vol[g] = (vol[g] || 0) + v; }
+  const labels = [...cm.labels].filter((l) => vol[l]).sort((a, b) => (vol[b] || 0) - (vol[a] || 0)).slice(0, 8);
+  if (labels.length < 2) return '';
+  const head = `<th>actual ↓ / pred →</th>${labels.map((l) => `<th>${esc(l)}</th>`).join('')}`;
+  const rows = labels.map((g) => {
+    const cells = labels.map((p) => {
+      const n = cm.cells[`${g}||${p}`] || 0;
+      return `<td class="num ${g === p ? 'diag' : n ? 'off' : ''}">${n || ''}</td>`;
+    }).join('');
+    return `<tr><th>${esc(g)}</th>${cells}</tr>`;
+  }).join('');
+  return `<div class="matrix"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function renderDetail(run) {
   const a = run.analysis;
-  let html = '';
-  if (a) {
-    if (a.boundary) {
-      const bd = a.boundary;
-      html += `<div class="stats">
-        <span>recall <b>${bd.recall}</b></span><span>precision <b>${bd.precision}</b></span><span>F1 <b>${bd.f1}</b></span>
-        <span class="bad">missed (merges) <b>${bd.fn}</b></span><span class="bad">spurious (splits) <b>${bd.fp}</b></span>
-        ${a.class ? `<span>page-class acc <b>${a.class.page_accuracy}</b></span>` : ''}
-      </div>`;
-    }
-    const pm = a.popular_misses || {};
-    html += `<div class="misses-grid">
-      ${pairTable('Most-merged boundaries (missed starts)', pm.merges, 'merge')}
-      ${pairTable('Most-split boundaries (spurious starts)', pm.splits, 'split')}
-      ${pairTable('Class confusion (page level)', pm.class_confusion, 'confuse')}
-    </div>`;
-    if (pm.bucket_merges && pm.bucket_merges.length) {
-      const rows = pm.bucket_merges.slice(0, 20).map((p) => `<tr><td><code>${p.from}</code> → <code>${p.to}</code></td><td class="num">${p.count}</td></tr>`).join('');
-      html += `<div class="misses"><h4>Bucket-level merges</h4><table><thead><tr><th>bucket → bucket</th><th>count</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    } else if (a.buckets_mapped === false && (pm.merges || []).length) {
-      html += `<p class="muted">Bucket rollup unavailable — no class→bucket map yet (add <code>bucket</code> to the class taxonomy).</p>`;
-    }
+  if (!a || !a.overview) {
+    // non-segmentation (or legacy) run: just show offenders
+    const bad = (run.items || []).filter((it) => it.correct === 0);
+    if (!bad.length) return '<p class="muted">No detailed analysis for this run.</p>';
+    const rows = bad.slice(0, 30).map((it) => [`<code>${esc(it.doc_id)}</code>`, '']);
+    return `<div class="misses"><h4>Docs with errors (${bad.length})</h4>${kvTable(['doc', ''], rows)}</div>`;
   }
-  // Per-doc offenders (works for any task with item results).
-  const bad = (run.items || []).filter((it) => it.correct === 0);
-  if (bad.length) {
-    const rows = bad.slice(0, 30).map((it) => {
-      let d = {}; try { d = JSON.parse(it.detail_json || '{}'); } catch {}
-      const extra = d.missed_pages ? `missed p${(d.missed_pages || []).join(', p') || '—'}${d.spurious_pages && d.spurious_pages.length ? `; extra p${d.spurious_pages.join(', p')}` : ''}` : '';
-      return `<tr><td><code>${it.doc_id}</code></td><td>${extra}</td></tr>`;
-    }).join('');
-    html += `<div class="misses"><h4>Docs with errors (${bad.length})</h4><table><tbody>${rows}</tbody></table></div>`;
+  const bd = a.boundary, pm = a.transitions || {};
+  let html = `<div class="drawer-tools"><button class="reagg" data-id="${run.id}">↻ re-aggregate from events</button>${a.buckets_mapped ? '' : ' <span class="muted">buckets not mapped — bucket views empty until <code>class_taxonomy.bucket</code> is filled</span>'}</div>`;
+
+  // Overview
+  const kf = (a.overview.key_findings || []).map((f) => `<li>${esc(f)}</li>`).join('');
+  html += section('Overview', `${kf ? `<ul class="findings">${kf}</ul>` : '<p class="muted">No notable patterns.</p>'}<p class="muted">${a.overview.n_docs} bundles · ${a.overview.n_pages} pages scored</p>`);
+
+  // Boundary + error taxonomy
+  const stats = `<div class="stats">
+    <span>recall <b>${bd.recall}</b></span><span>precision <b>${bd.precision}</b></span><span>F1 <b>${bd.f1}</b></span>
+    <span class="bad">missed (merges) <b>${bd.fn}</b></span><span class="bad">spurious (splits) <b>${bd.fp}</b></span>
+    <span>page-class acc <b>${bd.page_class_accuracy}</b></span></div>`;
+  const et = (a.error_types || []).length ? kvTable(['error type', 'count'], a.error_types.map((e) => [e.type, e.count])) : '';
+  html += section('Boundary analysis', stats + et);
+
+  // Transitions
+  html += section('Segment transitions', `<div class="misses-grid">
+    ${transitionTable(pm.merges, 'Most-merged (missed starts) — class → class')}
+    ${transitionTable(pm.splits, 'Most-split (spurious starts) — class → class')}
+    ${transitionTable(pm.class_confusion, 'Page class confusion — actual → predicted')}
+    ${a.buckets_mapped ? transitionTable(pm.bucket_merges, 'Bucket → bucket merges') : ''}
+  </div>`);
+
+  // Confusion matrix
+  html += section('Confusion matrix (top classes)', confusionMatrix(a.confusion_matrix));
+
+  // Class analysis
+  if ((a.class_analysis || []).length) {
+    const rows = a.class_analysis.slice(0, 30).map((c) => [c.class, c.page_precision, c.page_recall, c.page_f1, c.boundary_recall ?? '—', c.missed_starts, c.false_starts, c.most_confused_with || '—']);
+    html += section('Class analysis', kvTable(['class', 'P', 'R', 'F1', 'bound.recall', 'missed', 'false', 'confused w/'], rows));
   }
-  return html || '<p class="muted">No detailed analysis for this run.</p>';
+  // Bucket analysis
+  if ((a.bucket_analysis || []).length) {
+    const rows = a.bucket_analysis.map((c) => [c.bucket, c.page_precision, c.page_recall, c.gt_pages]);
+    html += section('Bucket analysis', kvTable(['bucket', 'P', 'R', 'gt pages'], rows));
+  }
+  // Segment length
+  if ((a.segment_length || []).length) {
+    const rows = a.segment_length.slice(0, 30).map((s) => [s.class, s.gt_avg_pages, s.pred_avg_pages, s.gt_count, s.pred_count]);
+    html += section('Segment length (GT vs predicted)', kvTable(['class', 'gt avg', 'pred avg', 'gt #', 'pred #'], rows));
+  }
+  // Over / under segmentation
+  const ou = a.over_under || {};
+  if ((ou.over_segmented || []).length || (ou.under_segmented || []).length) {
+    const line = (d) => `${d.doc_id} (${d.gt_segments}→${d.pred_segments})`;
+    html += section('Over / under-segmentation', `<div class="misses-grid">
+      <div class="misses"><h4>Under-segmented (docs merged)</h4><ul>${(ou.under_segmented || []).slice(0, 10).map((d) => `<li>${esc(line(d))}</li>`).join('') || '<li class="muted">none</li>'}</ul></div>
+      <div class="misses"><h4>Over-segmented (docs split)</h4><ul>${(ou.over_segmented || []).slice(0, 10).map((d) => `<li>${esc(line(d))}</li>`).join('') || '<li class="muted">none</li>'}</ul></div>
+    </div>`);
+  }
+  // Worst docs
+  if ((a.worst_docs || []).length) {
+    const rows = a.worst_docs.map((d) => [`<code>${esc(d.doc_id)}</code>`, d.n_pages, `${d.gt_segments}→${d.pred_segments}`, d.missed_boundaries, d.false_boundaries, d.max_displacement]);
+    html += section('Worst documents', kvTable(['doc', 'pages', 'segs g→p', 'missed', 'false', 'max shift'], rows));
+  }
+  // Confidence
+  if (a.confidence && a.confidence.available) {
+    const rows = a.confidence.bands.map((b) => [b.band, b.errors, b.total]);
+    html += section('Confidence', `<p class="${a.confidence.confidently_wrong ? 'bad' : 'muted'}">confidently wrong (high-conf errors): <b>${a.confidence.confidently_wrong}</b></p>${kvTable(['band', 'errors', 'pages'], rows)}`);
+  }
+  return html;
 }
 
 boot().catch((e) => msg('Failed to load: ' + e.message, 'err'));

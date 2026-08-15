@@ -3,7 +3,8 @@ import fastifyStatic from '@fastify/static';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, ROOT } from './db.js';
-import { createRun } from './runs.js';
+import { createRun, loadClassBuckets } from './runs.js';
+import { aggregate } from './scoring/seg_aggregate.js';
 import { ingestWandb } from './ingest/wandb.js';
 import { config, authConfigured } from './config.js';
 import { verifyPassword, issueToken, verifyToken, parseCookies, sessionCookie, clearCookie, COOKIE_NAME } from './auth.js';
@@ -182,6 +183,28 @@ app.get('/api/runs/:id', async (req, reply) => {
   run.metrics = d.prepare('SELECT key, value, scope FROM run_metrics WHERE run_id = ?').all(id);
   run.items = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ? LIMIT 2000').all(id);
   return run;
+});
+
+// Raw per-page events — the durable, re-aggregatable layer (foundation for future views).
+app.get('/api/runs/:id/events', async (req) => {
+  const id = Number(req.params.id);
+  const total = d.prepare('SELECT COUNT(*) c FROM analysis_events WHERE run_id = ?').get(id).c;
+  const limit = Math.min(Number(req.query.limit) || 5000, 20000);
+  const events = d.prepare('SELECT * FROM analysis_events WHERE run_id = ? ORDER BY id LIMIT ?').all(id, limit);
+  return { run_id: id, total, returned: events.length, events };
+});
+
+// Re-derive the analysis from stored events WITHOUT re-scoring — e.g. after populating class
+// buckets, or when a new analysis view is added. Persists the refreshed blob to the run.
+app.post('/api/runs/:id/reaggregate', async (req, reply) => {
+  const id = Number(req.params.id);
+  const run = d.prepare('SELECT id, task FROM runs WHERE id = ?').get(id);
+  if (!run) return reply.code(404).send({ error: 'not found' });
+  const events = d.prepare('SELECT * FROM analysis_events WHERE run_id = ?').all(id);
+  if (!events.length) return reply.code(400).send({ error: 'no_events', message: 'this run has no stored events to re-aggregate' });
+  const analysis = aggregate(events, { classBuckets: loadClassBuckets(d) });
+  d.prepare('UPDATE runs SET analysis_json = ? WHERE id = ?').run(JSON.stringify(analysis), id);
+  return { ok: true, run_id: id, analysis };
 });
 
 app.delete('/api/runs/:id', async (req) => {

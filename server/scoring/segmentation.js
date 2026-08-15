@@ -1,33 +1,30 @@
-// Segmentation scorer.
+// Segmentation scorer — EVENT-SOURCED.
 //
-// FORMAT (chaitu, 2026-08-15): a bundle is a sequence of pages. Each page is tagged
-//   `start` | `continue` and carries its document `class`. In-app JSON shape:
-//     bundleId -> [ { "page": 1, "tag": "start", "class": "aadhaar" },
-//                   { "page": 2, "tag": "continue", "class": "aadhaar" }, ... ]
-//   (This is the grouped form of the per-page JSONL the pipeline emits — one row per page.)
+// FORMAT (chaitu, 2026-08-15): a bundle is a sequence of pages; each page is tagged
+//   `start` | `continue` with its document `class` (grouped form of the per-page JSONL the
+//   pipeline emits). A boundary = a `start` after the first page (an internal cut); missing one
+//   MERGES two docs, so boundary RECALL is the headline (a missed start is the costly error).
 //
-// A "boundary" = a `start` page after the first (an internal cut). Missing one MERGES two
-// docs; a spurious one SPLITS a doc.
-//
-// HEADLINE = boundary RECALL: per chaitu, a missed start page is the failure that matters
-// most (two docs silently merged), so recall is the primary number.
-//
-// DETAILED ANALYSIS (per run, surfaced as a drop-down): the "popular misses" — which
-// class->class transitions get merged/split most, plus a class->bucket rollup. Buckets
-// (KYC, PKYC, ITR, financial, property, rental, ...) come from the class taxonomy's
-// `bucket` column; until that's populated the bucket fields are null (scaffold in place).
-import { normalizeLabel, prf, round } from './util.js';
+// DESIGN: `extractEvents()` emits ONE atomic event per page (the durable record we persist to
+// `analysis_events`). Every analysis view — confusion matrix, per-class/bucket, segment length,
+// worst docs, transitions — is derived in seg_aggregate.js as a pure function of those events, so
+// a new view later is a re-aggregation over stored events, never a re-score.
+import { normalizeLabel, round } from './util.js';
+import { aggregate } from './seg_aggregate.js';
 
-// Tolerant tag reading. First page of a bundle is always a segment start.
 const START_WORDS = new Set(['start', 's', 'begin', 'b', 'new', 'boundary', 'true', 'yes', '1']);
 function isStart(row, idx) {
-  if (idx === 0) return true;
+  if (idx === 0) return true; // first page of a bundle is always a segment start
   const t = normalizeLabel(row && (row.tag ?? row.boundary ?? row.seg ?? row.type));
   return t === '' ? false : START_WORDS.has(t); // no tag -> continue
 }
 function classOf(row) {
   const raw = row && (row.class ?? row.doc_class ?? row.doc_type ?? row.category);
   return raw == null ? '' : normalizeLabel(raw);
+}
+function confOf(row) {
+  const c = row && (row.confidence ?? row.conf ?? row.prob ?? row.score);
+  return c == null ? null : Number(c);
 }
 function pageNo(row, idx) {
   const p = row && (row.page ?? row.page_no ?? row.page_number);
@@ -38,131 +35,101 @@ function pagesOf(v) {
   if (v && Array.isArray(v.pages)) return v.pages;
   return [];
 }
-
-// Internal starts only (idx > 0) — the meaningful boundaries.
-function internalStarts(pages) {
-  const s = new Set();
-  pages.forEach((row, i) => { if (i > 0 && isStart(row, i)) s.add(i); });
-  return s;
-}
-// Segment (doc) class per page = class declared at the most recent start at/before the page.
+// segment (doc) class per page = class declared at the most recent start at/before the page
 function segClassByPage(pages) {
   const out = []; let cur = '';
   pages.forEach((row, i) => { if (isStart(row, i)) cur = classOf(row); out[i] = cur; });
   return out;
 }
-// Per-page class = the row's own class, forward-filled when a continue row omits it.
+// per-page class = the row's own class, forward-filled when a continue omits it
 function pageClassByPage(pages) {
   const out = []; let cur = '';
   pages.forEach((row, i) => { const c = classOf(row); if (c) cur = c; out[i] = cur; });
   return out;
 }
 
-const inc = (map, key) => map.set(key, (map.get(key) || 0) + 1);
-function pairList(map, buckets) {
-  return [...map.entries()]
-    .map(([k, count]) => {
-      const [from, to] = k.split('||');
-      return { from, to, from_bucket: buckets[from] || null, to_bucket: buckets[to] || null, count };
-    })
-    .sort((a, b) => b.count - a.count);
-}
-function bucketPairList(map) {
-  return [...map.entries()]
-    .map(([k, count]) => { const [from, to] = k.split('||'); return { from, to, count }; })
-    .sort((a, b) => b.count - a.count);
+// Emit one event per (bundle, page). `bucketFor(class)` maps a class -> coarse bucket (or null).
+export function extractEvents(pred, gt, opts = {}) {
+  const buckets = opts.classBuckets || {};
+  const bucketFor = (c) => buckets[c] || null;
+  const events = [];
+  for (const doc_id of Object.keys(gt)) {
+    const gp = pagesOf(gt[doc_id]);
+    const pp = pagesOf(pred[doc_id]);
+    const gSeg = segClassByPage(gp), gPage = pageClassByPage(gp);
+    const pSeg = segClassByPage(pp), pPage = pageClassByPage(pp);
+    for (let i = 0; i < gp.length; i++) {
+      const gStart = isStart(gp[i], i);
+      const hasPred = i < pp.length;
+      const pStart = hasPred ? isStart(pp[i], i) : false; // missing pred page -> treated as continue
+      const gtBoundary = i > 0 && gStart;
+      const predBoundary = i > 0 && pStart;
+
+      let error_type = null;
+      if (gtBoundary && !predBoundary) error_type = 'missed_start';       // merge
+      else if (predBoundary && !gtBoundary) error_type = 'false_start';   // split
+      else if (gSeg[i] !== (pSeg[i] || '')) error_type = 'wrong_class';   // boundary agrees, class wrong
+
+      events.push({
+        doc_id, page: pageNo(gp[i], i),
+        gt_tag: gStart ? 'start' : 'continue',
+        pred_tag: hasPred ? (pStart ? 'start' : 'continue') : null,
+        gt_class: gPage[i] || null,
+        pred_class: hasPred ? (pPage[i] || null) : null,
+        gt_seg_class: gSeg[i] || null,
+        pred_seg_class: hasPred ? (pSeg[i] || null) : null,
+        gt_bucket: bucketFor(gSeg[i]),
+        pred_bucket: hasPred ? bucketFor(pSeg[i]) : null,
+        gt_boundary: gtBoundary ? 1 : 0,
+        pred_boundary: predBoundary ? 1 : 0,
+        error_type,
+        confidence: hasPred ? confOf(pp[i]) : null,
+        prev_gt_class: i > 0 ? (gSeg[i - 1] || null) : null,
+      });
+    }
+  }
+  return events;
 }
 
 export function score(pred, gt, opts = {}) {
-  const buckets = opts.classBuckets || {};
-  const bkt = (c) => buckets[c] || null;
+  const events = extractEvents(pred, gt, opts);
+  const analysis = aggregate(events, opts);
+  const bd = analysis.boundary;
 
-  let tp = 0, fp = 0, fn = 0, exact = 0, nBundles = 0, pageTot = 0, pageHit = 0;
-  const merges = new Map();       // missed boundary  -> two docs wrongly MERGED (from->to class)
-  const splits = new Map();       // spurious boundary -> a doc wrongly SPLIT
-  const classConf = new Map();    // per-page class confusion (trueClass -> predClass)
-  const bucketMerges = new Map(); // bucket-level rollup of merges (scaffold; null until buckets set)
+  // per-doc item rows (drill-down / audit-vs-source)
+  const byDoc = new Map();
+  for (const e of events) { if (!byDoc.has(e.doc_id)) byDoc.set(e.doc_id, []); byDoc.get(e.doc_id).push(e); }
   const items = [];
-
-  for (const id of Object.keys(gt)) {
-    const gp = pagesOf(gt[id]);
-    const pp = pagesOf(pred[id]);
-    const gStart = internalStarts(gp);
-    const pStart = internalStarts(pp);
-    const gSeg = segClassByPage(gp);
-    const gPageCls = pageClassByPage(gp);
-    const pPageCls = pageClassByPage(pp);
-
-    let dtp = 0, dfp = 0, dfn = 0;
-    const missedPages = [], spuriousPages = [];
-
-    for (const i of gStart) {
-      if (pStart.has(i)) { dtp++; continue; }
-      dfn++; // missed start -> merge
-      const from = gSeg[i - 1] || 'unknown', to = gSeg[i] || 'unknown';
-      inc(merges, `${from}||${to}`);
-      if (bkt(from) || bkt(to)) inc(bucketMerges, `${bkt(from) || '?'}||${bkt(to) || '?'}`);
-      missedPages.push(pageNo(gp[i], i));
-    }
-    for (const i of pStart) {
-      if (gStart.has(i)) continue;
-      dfp++; // spurious start -> split
-      const from = gSeg[i - 1] || 'unknown', to = gSeg[i] || 'unknown';
-      inc(splits, `${from}||${to}`);
-      spuriousPages.push(pageNo(pp[i], i));
-    }
-    tp += dtp; fp += dfp; fn += dfn;
-
-    // Per-page class accuracy + confusion (aligned by page index up to the GT length).
-    for (let i = 0; i < gp.length; i++) {
-      const tc = gPageCls[i]; if (!tc) continue;
-      const pc = pPageCls[i] || '';
-      pageTot++;
-      if (pc === tc) pageHit++;
-      else inc(classConf, `${tc}||${pc || '∅'}`);
-    }
-
-    const isExact = dfp === 0 && dfn === 0;
-    nBundles++; if (isExact) exact++;
+  let exact = 0;
+  for (const [doc_id, evs] of byDoc) {
+    const missed = evs.filter((e) => e.error_type === 'missed_start').map((e) => e.page);
+    const spurious = evs.filter((e) => e.error_type === 'false_start').map((e) => e.page);
+    const isExact = missed.length === 0 && spurious.length === 0;
+    if (isExact) exact++;
     items.push({
-      doc_id: id,
-      predicted_json: JSON.stringify([...pStart]),
-      gold_json: JSON.stringify([...gStart]),
+      doc_id,
+      predicted_json: JSON.stringify(evs.filter((e) => e.pred_boundary).map((e) => e.page)),
+      gold_json: JSON.stringify(evs.filter((e) => e.gt_boundary).map((e) => e.page)),
       correct: isExact ? 1 : 0,
-      detail_json: JSON.stringify({ tp: dtp, fp: dfp, fn: dfn, n_pages: gp.length, missed_pages: missedPages, spurious_pages: spuriousPages }),
+      detail_json: JSON.stringify({ n_pages: evs.length, missed_pages: missed, spurious_pages: spurious }),
     });
   }
-
-  const { precision, recall, f1 } = prf(tp, fp, fn);
-  const pageAcc = pageTot ? round(pageHit / pageTot) : 0;
-  const exactRate = nBundles ? round(exact / nBundles) : 0;
-
-  const analysis = {
-    boundary: { recall, precision, f1, tp, fp, fn },
-    class: { page_accuracy: pageAcc, pages_scored: pageTot },
-    buckets_mapped: Object.keys(buckets).length > 0,
-    // "popular misses" — what the drop-down shows, most-frequent first.
-    popular_misses: {
-      merges: pairList(merges, buckets),          // missed boundaries: docs wrongly merged (from->to)
-      splits: pairList(splits, buckets),          // spurious boundaries: docs wrongly split
-      class_confusion: pairList(classConf, buckets),
-      bucket_merges: bucketPairList(bucketMerges), // empty until class->bucket map is populated
-    },
-  };
+  const nBundles = byDoc.size;
 
   return {
-    headline: { key: 'boundary_recall', value: recall },
+    headline: { key: 'boundary_recall', value: bd.recall },
     metrics: [
-      { key: 'boundary_recall', value: recall, scope: 'overall' },
-      { key: 'boundary_f1', value: f1, scope: 'overall' },
-      { key: 'boundary_precision', value: precision, scope: 'overall' },
-      { key: 'missed_boundaries', value: fn, scope: 'overall' },
-      { key: 'spurious_boundaries', value: fp, scope: 'overall' },
-      { key: 'page_class_accuracy', value: pageAcc, scope: 'overall' },
-      { key: 'exact_match', value: exactRate, scope: 'overall' },
+      { key: 'boundary_recall', value: bd.recall, scope: 'overall' },
+      { key: 'boundary_f1', value: bd.f1, scope: 'overall' },
+      { key: 'boundary_precision', value: bd.precision, scope: 'overall' },
+      { key: 'missed_boundaries', value: bd.fn, scope: 'overall' },
+      { key: 'spurious_boundaries', value: bd.fp, scope: 'overall' },
+      { key: 'page_class_accuracy', value: bd.page_class_accuracy, scope: 'overall' },
+      { key: 'exact_match', value: nBundles ? round(exact / nBundles) : 0, scope: 'overall' },
       { key: 'n_bundles', value: nBundles, scope: 'overall' },
     ],
     items,
     analysis,
+    events, // persisted to analysis_events by createRun() — the durable, re-aggregatable layer
   };
 }

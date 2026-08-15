@@ -20,9 +20,12 @@ One place to answer *"which model config wins, on which task, on which dataset."
 | Coverage gate (GT-completeness before scoring) | ✅ working |
 | Classification scorer | ✅ solid (normalized labels) |
 | Extraction scorer (field-typed) | ✅ solid |
-| Segmentation scorer | ✅ per-page start/continue+class model; recall-first; **popular-misses analysis** |
-| Per-run drill-down (popular misses) | ✅ segmentation: merges/splits/class-confusion + per-doc offenders |
-| Class→bucket rollup for segmentation | 🟡 scaffolded (`class_taxonomy.bucket`); empty until the bucket schema lands |
+| Segmentation scorer | ✅ per-page start/continue+class; **event-sourced** (one event/page) |
+| Segmentation analysis views | ✅ boundary, confusion matrix, per-class/bucket, segment-length, over/under, worst-docs, error taxonomy, transitions+examples, confidence |
+| Per-run drill-down UI | ✅ structured, collapsible sections; re-aggregate button |
+| Re-aggregate from stored events (no re-score) | ✅ `POST /api/runs/:id/reaggregate` — new views/buckets apply to old runs |
+| Class→bucket rollup | 🟡 scaffolded (`class_taxonomy.bucket`); fill it + re-aggregate to light up bucket views |
+| Run-to-run regression comparison | ❌ not built (event store makes it a thin add) |
 | Segregation scorer | 🟡 works; applicant-grouping confirmed, metrics are standard |
 | Run identity (semantic name + random dedup id) | ✅ working |
 | Model registry + model cards | ✅ working |
@@ -86,7 +89,8 @@ server/
     util.js            normalizers (text/label/number/date) + P/R/F1 helpers
     classification.js  accuracy, macro-F1, per-class F1, profile-subset scoping
     extraction.js      field-typed match, per-field + per-doc accuracy
-    segmentation.js    boundary recall (headline) / F1 / exact-match
+    segmentation.js    per-page scorer: emits atomic EVENTS (one/page) + headline recall
+    seg_aggregate.js   PURE aggregator: events -> all analysis views (re-runnable from DB)
     segregation.js     Adjusted Rand Index + purity (partition agreement)
 public/                no-build vanilla-JS UI: index.html, app.js, style.css, login.html
 scripts/set-password.js  set/reset the login credential
@@ -113,6 +117,10 @@ coverage and scoring are consistent across the UI, manual entry, and future W&B 
   ingest), `gt_fingerprint`. Coverage: `coverage_status` (full|partial|manual), `coverage_missing`.
 - `run_metrics` — flexible `{run_id, key, value, scope}` (metrics differ per task).
 - `item_results` — per-doc predicted-vs-gold for drill-down.
+- `analysis_events` — **the durable atomic layer** (segmentation): one row per page per run
+  (`gt_tag/pred_tag`, classes, `gt_boundary/pred_boundary`, `error_type`, `confidence`, `prev_gt_class`).
+  Every analysis view is a re-aggregation over these — a new view (or a newly-populated bucket map)
+  applies to historical runs without re-scoring. `runs.analysis_json` is just the cached aggregate.
 
 ---
 
@@ -129,7 +137,7 @@ Normalizers live in `server/scoring/util.js`:
 |---|---|---|---|
 | classification | `accuracy` | macro-F1, per-class P/R/F1, out-of-scope count | labels normalized via `normalizeLabel`; profile scopes to a class subset |
 | extraction | `field_accuracy` | `doc_exact_match`, per-field acc | field-typed via `extraction_types.field_schema`; falls back to string if none |
-| segmentation | `boundary_recall` | F1, precision, `missed_boundaries`, `spurious_boundaries`, `page_class_accuracy`, exact-match | per-page `start`/`continue`+`class`; **recall-first: a missed start = two docs merged** (chaitu). Row drop-down = *popular misses*: which `class→class` (and `bucket→bucket`) boundaries get merged/split most |
+| segmentation | `boundary_recall` | F1, precision, `missed_boundaries`, `spurious_boundaries`, `page_class_accuracy`, exact-match | per-page `start`/`continue`+`class`; **recall-first: a missed start = two docs merged** (chaitu). Event-sourced → the row drop-down renders confusion matrix, per-class/bucket, segment-length, over/under-seg, worst-docs, error taxonomy, transitions w/ examples, confidence |
 | segregation | `ari` | purity, #groups | partition agreement (label values don't need to match, only co-membership) |
 
 ---
@@ -146,7 +154,9 @@ Normalizers live in `server/scoring/util.js`:
 | POST | `/api/runs/manual` | add a row by typing metrics (no scoring) |
 | PATCH | `/api/runs/:id` | rename a run's `display_name` |
 | GET | `/api/leaderboard?task=&dataset_id=` | the board rows + overall metrics |
-| GET/DELETE | `/api/runs/:id` | full run detail (incl. item_results) / delete |
+| GET/DELETE | `/api/runs/:id` | full run detail (incl. `analysis` + item_results) / delete |
+| GET | `/api/runs/:id/events` | raw per-page events (the re-aggregatable layer) |
+| POST | `/api/runs/:id/reaggregate` | re-derive `analysis` from stored events (apply new views/buckets, no re-score) |
 | POST | `/api/ingest/wandb` | W&B auto-ingest — **501 until `ARTHA_WANDB_INGEST=on`** |
 
 Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomplete`→422,
@@ -174,10 +184,14 @@ Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomp
   casing/whitespace mismatches without mangling controlled codes.
 - **Segmentation is per-page + recall-first.** A bundle is an ordered page list, each page tagged
   `start`/`continue` with its `class` (grouped form of the pipeline's per-page JSONL). A boundary is
-  an internal `start`; missing one silently **merges** two docs → recall is the headline. Every run
-  carries a **popular-misses analysis** (`analysis_json`): the `class→class` transitions most often
-  merged/split, page-level class confusion, and a `bucket→bucket` rollup. Buckets (KYC/PKYC/ITR/…)
-  come from `class_taxonomy.bucket` — scaffolded now, populated when chaitu supplies the mapping.
+  an internal `start`; missing one silently **merges** two docs → recall is the headline.
+- **Segmentation analysis is event-sourced** (the load-bearing decision). The scorer emits one atomic
+  event per page to `analysis_events`; **every analysis view is a pure re-aggregation** over those
+  events (`seg_aggregate.js`), never baked into the scorer. So a new view invented later — or a
+  newly-populated `class_taxonomy.bucket` map — applies to *historical* runs via
+  `POST /api/runs/:id/reaggregate`, with **no re-scoring and no re-upload**. `analysis_json` is only a
+  cache of the current aggregate. Buckets are **derived at aggregation time** from class (not stored on
+  the event), which is what makes the map retroactive.
 - **Auth is deliberately minimal** — one credential in `.env`, scrypt-hashed, HMAC-signed cookie,
   no user table, no dependency. Enough to gate a phone-reachable internal tool; not a multi-user system.
 - **No-build frontend on purpose** — vanilla JS so it runs on the VM/phone immediately. The React +
@@ -206,8 +220,13 @@ Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomp
   and what the coverage gate checks. chaitu defines the doc_id scheme.
 - **Starter credential** used in dev/smoke: `chaitu` / `changeme-artha` — change it before deploying.
 - `.env` is gitignored; only `.env.example` is tracked. `data/` (DB + uploads) is fully gitignored.
+- **Add a new segmentation analysis view** → add a derivation to `seg_aggregate.js::aggregate()`
+  (pure function of events) and render it in `app.js::renderDetail`. Old runs pick it up via
+  `POST /api/runs/:id/reaggregate` — no re-scoring, because the events are already stored.
 - **Populate segmentation buckets** → fill `class_taxonomy.bucket` (KYC/PKYC/ITR/financial/property/
-  rental/…). The scorer picks it up automatically (via `scoringOpts`) and the `bucket→bucket` rollup
-  appears in every new run's drop-down; no code change needed.
+  rental/…), then `reaggregate` existing runs (new runs get it automatically). Buckets are derived
+  from class at aggregation time, so the map is fully retroactive; no code change needed.
+- **Regression comparison (§10, not built)** is deliberately cheap now: diff two runs' aggregates (or
+  re-aggregate both from `analysis_events`); the atomic events are the shared substrate.
 - **Segregation** still carries a `[semantics DRAFT]` header in-file — confirm what a "group" means on
   real data before trusting ARI/purity. Segmentation's format is locked.

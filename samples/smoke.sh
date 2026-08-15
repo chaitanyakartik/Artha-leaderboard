@@ -30,7 +30,13 @@ post /api/runs '{"task":"classification","dataset_id":'"$DSID"',"model_config_id
 echo "== segmentation (per-page start/continue+class), headline=recall, one missed boundary =="
 post "/api/datasets/$DSID/gt" '{"task":"segmentation","gt":{"bundleA":[{"page":1,"tag":"start","class":"aadhaar"},{"page":2,"tag":"continue","class":"aadhaar"},{"page":3,"tag":"start","class":"pan"},{"page":4,"tag":"start","class":"bank_statement"}]}}' >/dev/null
 SEG=$(post /api/runs '{"task":"segmentation","dataset_id":'"$DSID"',"model_config_id":"gemini-only","predictions":{"bundleA":[{"page":1,"tag":"start","class":"aadhaar"},{"page":2,"tag":"continue","class":"aadhaar"},{"page":3,"tag":"continue","class":"aadhaar"},{"page":4,"tag":"start","class":"bank_statement"}]}}')
-echo "$SEG" | python3 -c 'import sys,json;d=json.load(sys.stdin);print("  headline="+d["headline"]["key"]+"="+str(d["headline"]["value"]));m=d["analysis"]["popular_misses"]["merges"];print("  top merge:",m[0]["from"],"->",m[0]["to"],"x",m[0]["count"]) if m else print("  no merges")'
+echo "$SEG" | python3 -c 'import sys,json;d=json.load(sys.stdin);print("  headline="+d["headline"]["key"]+"="+str(d["headline"]["value"]));m=d["analysis"]["transitions"]["merges"];print("  top merge:",m[0]["from"],"->",m[0]["to"],"x",m[0]["count"]) if m else print("  no merges")'
+SEGID=$(echo "$SEG" | jq 'd["run_id"]')
+
+echo "== event store: per-page events persisted for re-aggregation =="
+get "/api/runs/$SEGID/events" | jq '"  events stored="+str(d["total"])'
+echo "== re-aggregate from stored events (no re-score) =="
+post "/api/runs/$SEGID/reaggregate" '{}' | jq '"  reaggregated ok, findings="+str(len(d["analysis"]["overview"]["key_findings"]))'
 
 echo "== W&B ingest gated OFF (expect 501) =="
 curl -s -b "$J" -o /dev/null -w "status=%{http_code}\n" -X POST "$B/api/ingest/wandb" -H 'content-type: application/json' -d '{}'

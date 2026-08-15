@@ -15,6 +15,13 @@ export function gtFingerprint(gt) {
   return crypto.createHash('sha256').update(norm).digest('hex').slice(0, 16);
 }
 
+// class -> bucket map (KYC/PKYC/ITR/...), keyed by the normalized class code so it matches the
+// scorer. Empty until class_taxonomy.bucket is populated. Shared by scoring + re-aggregation.
+export function loadClassBuckets(d) {
+  const rows = d.prepare('SELECT code, bucket FROM class_taxonomy WHERE bucket IS NOT NULL').all();
+  return Object.fromEntries(rows.map((r) => [normalizeLabel(r.code), r.bucket]));
+}
+
 export function loadGt(d, datasetId, task) {
   const rows = d.prepare('SELECT doc_id, gold_json FROM gt_items WHERE dataset_id = ? AND task = ?').all(datasetId, task);
   const gt = {};
@@ -34,10 +41,8 @@ function scoringOpts(d, task, { profileId, extractionTypeId }) {
     if (et?.field_schema) opts.fieldSchema = JSON.parse(et.field_schema);
   }
   if (task === 'segmentation') {
-    // class -> bucket map for the bucket-level "popular misses". Empty until the taxonomy's
-    // `bucket` column is populated (schema pending); keys normalized to match the scorer.
-    const rows = d.prepare('SELECT code, bucket FROM class_taxonomy WHERE bucket IS NOT NULL').all();
-    if (rows.length) opts.classBuckets = Object.fromEntries(rows.map((r) => [normalizeLabel(r.code), r.bucket]));
+    const bk = loadClassBuckets(d);
+    if (Object.keys(bk).length) opts.classBuckets = bk;
   }
   return opts;
 }
@@ -140,6 +145,19 @@ export function createRun(d, params) {
     for (const m of result.metrics) mStmt.run(run_id, m.key, m.value, m.scope);
     const iStmt = d.prepare('INSERT INTO item_results (run_id, doc_id, predicted_json, gold_json, correct, detail_json) VALUES (?, ?, ?, ?, ?, ?)');
     for (const it of result.items) iStmt.run(run_id, it.doc_id, it.predicted_json, it.gold_json, it.correct, it.detail_json);
+
+    // Durable atomic events — the re-aggregatable layer (segmentation emits these).
+    if (result.events && result.events.length) {
+      const eStmt = d.prepare(
+        `INSERT INTO analysis_events (run_id, doc_id, page, gt_tag, pred_tag, gt_class, pred_class,
+           gt_seg_class, pred_seg_class, gt_bucket, pred_bucket, gt_boundary, pred_boundary,
+           error_type, confidence, prev_gt_class)
+         VALUES (@run_id, @doc_id, @page, @gt_tag, @pred_tag, @gt_class, @pred_class,
+           @gt_seg_class, @pred_seg_class, @gt_bucket, @pred_bucket, @gt_boundary, @pred_boundary,
+           @error_type, @confidence, @prev_gt_class)`
+      );
+      for (const e of result.events) eStmt.run({ run_id, ...e });
+    }
     return run_id;
   });
   const run_id = tx();
