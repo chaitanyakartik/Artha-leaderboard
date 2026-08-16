@@ -1,0 +1,26 @@
+{
+  "schema": "artha.gt/1",
+  "dataset": "seg-cls-v1",
+  "task": "segmentation",
+  "gt": {
+    "0100c5a7_0": [
+      { "page": 1, "tag": "start",    "class": "itr_individual_full" },
+      { "page": 2, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 3, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 4, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 5, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 6, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 7, "tag": "continue", "class": "itr_individual_full" }
+    ],
+    "0100c5a7_7": [
+      { "page": 8,  "tag": "continue", "class": "itr_individual_full" },
+      { "page": 9,  "tag": "start",    "class": "form_16" },
+      { "page": 10, "tag": "continue", "class": "form_16" },
+      { "page": 11, "tag": "start",    "class": "bank_statement" },
+      { "page": 12, "tag": "continue", "class": "bank_statement" },
+      { "page": 13, "tag": "continue", "class": "bank_statement" },
+      { "page": 14, "tag": "continue", "class": "bank_statement" }
+    ]
+  },
+  "_note": "window_id = <fileHash[:8]>_<window_start>. tag start|continue; class is a taxonomy code. In seg_window_mode, EVERY start counts as a boundary (page 8 above is a continue = mid-document — the window started inside a doc)."
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "artha.dataset/1",
+  "name": "seg-cls-v1",
+  "tasks": ["segmentation"],
+  "seg_window_mode": true,
+  "n_windows": 307,
+  "eval_slice": { "name": "first-24-start-windows", "n_windows": 24, "n_gold_starts": 33 },
+  "source_manifest": "unified_seg_cls_val_s7.jsonl",
+  "s3_root": "s3://artha-docs/seg-cls-v1/",
+  "notes": "stride-7, 11-image sliding window, 7-item target. Windows = stream slices → seg_window_mode."
+}

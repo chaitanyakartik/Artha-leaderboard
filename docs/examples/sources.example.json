@@ -1,0 +1,18 @@
+{
+  "schema": "artha.sources/1",
+  "dataset": "seg-cls-v1",
+  "s3_root": "s3://artha-docs/seg-cls-v1/",
+  "docs": {
+    "0100c5a7_0": [
+      "s3://artha-docs/seg-cls-v1/0100c5a7/p1.png",
+      "s3://artha-docs/seg-cls-v1/0100c5a7/p2.png",
+      "s3://artha-docs/seg-cls-v1/0100c5a7/p3.png",
+      "s3://artha-docs/seg-cls-v1/0100c5a7/p4.png",
+      "s3://artha-docs/seg-cls-v1/0100c5a7/p5.png",
+      "s3://artha-docs/seg-cls-v1/0100c5a7/p6.png",
+      "s3://artha-docs/seg-cls-v1/0100c5a7/p7.png"
+    ],
+    "appl12_doc03": "s3://artha-docs/seg-cls-v1/appl12/doc03.pdf"
+  },
+  "_note": "For segmentation windows, value = the window's target page images (list). For per-doc tasks, value = the document URI (string) or its page list. doc_id must match the GT and predictions files."
+}

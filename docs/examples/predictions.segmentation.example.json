@@ -1,0 +1,35 @@
+{
+  "schema": "artha.pred/1",
+  "meta": {
+    "model_config_id": "chandra-4b-ft",
+    "checkpoint": "full-ft-ckpt-1200",
+    "task": "segmentation",
+    "dataset": "seg-cls-v1",
+    "prompt": { "name": "unified_seg_cls", "version": "v2" },
+    "generated_at": "2026-08-16",
+    "env": { "SEGCLS_TRIM_LEAK": 1 },
+    "slice": "first-24-start-windows",
+    "notes": "greedy, max_new_tokens=120"
+  },
+  "predictions": {
+    "0100c5a7_0": [
+      { "page": 1, "tag": "start",    "class": "itr_individual_full" },
+      { "page": 2, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 3, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 4, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 5, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 6, "tag": "continue", "class": "itr_individual_full" },
+      { "page": 7, "tag": "continue", "class": "itr_individual_full" }
+    ],
+    "0100c5a7_7": [
+      { "page": 8,  "tag": "continue", "class": "itr_individual_full" },
+      { "page": 9,  "tag": "start",    "class": "form_16" },
+      { "page": 10, "tag": "continue", "class": "form_16" },
+      { "page": 11, "tag": "continue", "class": "form_16" },
+      { "page": 12, "tag": "continue", "class": "form_16" },
+      { "page": 13, "tag": "continue", "class": "form_16" },
+      { "page": 14, "tag": "continue", "class": "form_16" }
+    ]
+  },
+  "_note": "Same shape as GT. window 0100c5a7_7 here MISSES the start at page 11 (bank_statement merged into form_16) — that's a missed boundary. If a window's model output didn't parse, set its value to [] and the app scores it as a full miss."
+}
