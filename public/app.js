@@ -101,21 +101,27 @@ async function saveDoc() {
   finally { btn.disabled = false; }
 }
 
+// Datasets are scoped per task-group: seg+cls share one pool; extraction and segregation each own theirs.
+const TASK_GROUP = { segmentation: 'seg-cls', classification: 'seg-cls', extraction: 'extraction', segregation: 'segregation' };
+const datasetsInScope = () => state.datasets.filter((d) => (d.scope || 'seg-cls') === TASK_GROUP[state.task]);
+
 function renderDatasets() {
   const sel = $('#dataset');
+  const list = datasetsInScope();
   sel.innerHTML = '';
-  if (!state.datasets.length) {
+  if (!list.length) {
     sel.innerHTML = '<option value="">— no datasets —</option>';
     state.datasetId = null;
+    sel.onchange = null;
     return;
   }
-  for (const ds of state.datasets) {
+  for (const ds of list) {
     const o = document.createElement('option');
     o.value = ds.id;
     o.textContent = ds.n_docs ? `${ds.name} (${ds.n_docs} docs)` : ds.name;
     sel.appendChild(o);
   }
-  if (!state.datasetId) state.datasetId = state.datasets[0].id;
+  if (!list.some((d) => d.id === state.datasetId)) state.datasetId = list[0].id; // keep a valid pick for this group
   sel.value = state.datasetId;
   sel.onchange = () => { state.datasetId = Number(sel.value); refresh(); };
 }
@@ -188,14 +194,15 @@ $('#filePicker').addEventListener('change', async (e) => {
 function pickJson(cb) { _cb = cb; $('#filePicker').click(); }
 
 async function newDataset() {
-  const name = prompt('Dataset name (e.g. V1):');
+  const scope = TASK_GROUP[state.task];
+  const name = prompt(`Dataset name (for the ${scope} group, e.g. V1):`);
   if (!name) return;
   const n_applicants = Number(prompt('# applicants (optional):') || '') || null;
   const n_docs = Number(prompt('# docs (optional):') || '') || null;
   try {
-    const ds = await api('/api/datasets', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, n_applicants, n_docs }) });
+    const ds = await api('/api/datasets', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, n_applicants, n_docs, scope }) });
     state.datasets.unshift(ds); state.datasetId = ds.id;
-    renderDatasets(); msg(`Dataset <code>${ds.name}</code> created.`, 'ok'); refresh();
+    renderDatasets(); msg(`Dataset <code>${ds.name}</code> created in the <b>${scope}</b> group.`, 'ok'); refresh();
   } catch (e) { msg(e.message, 'err'); }
 }
 
@@ -261,6 +268,7 @@ function pickModel() {
 }
 
 async function refresh() {
+  renderDatasets(); // re-filter the dataset dropdown to the current task's group
   await loadContext();
   await loadPrompts();
   // GT status line

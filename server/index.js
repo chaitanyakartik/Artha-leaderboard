@@ -140,13 +140,15 @@ app.delete('/api/prompts/:id', async (req) => { d.prepare('DELETE FROM prompts W
 app.get('/api/datasets', async () => d.prepare('SELECT * FROM datasets ORDER BY created_at DESC').all());
 
 app.post('/api/datasets', async (req, reply) => {
-  const { name, n_applicants, n_docs, source_manifest, notes, seg_window_mode } = req.body || {};
+  const { name, n_applicants, n_docs, source_manifest, notes, seg_window_mode, scope } = req.body || {};
   if (!name) return reply.code(400).send({ error: 'name required' });
+  const SCOPES = ['seg-cls', 'extraction', 'segregation'];
+  const sc = SCOPES.includes(scope) ? scope : 'seg-cls';
   try {
     const info = d.prepare(
-      `INSERT INTO datasets (name, n_applicants, n_docs, source_manifest, seg_window_mode, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(name, n_applicants ?? null, n_docs ?? null, source_manifest ?? null, seg_window_mode ? 1 : 0, notes ?? null);
+      `INSERT INTO datasets (name, n_applicants, n_docs, source_manifest, scope, seg_window_mode, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(name, n_applicants ?? null, n_docs ?? null, source_manifest ?? null, sc, seg_window_mode ? 1 : 0, notes ?? null);
     return d.prepare('SELECT * FROM datasets WHERE id = ?').get(info.lastInsertRowid);
   } catch (e) {
     return reply.code(400).send({ error: String(e.message || e) });

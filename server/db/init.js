@@ -23,6 +23,8 @@ ensureCol('runs', 'origin', "TEXT NOT NULL DEFAULT 'ui'");
 ensureCol('runs', 'external_ref', 'TEXT');
 ensureCol('runs', 'gt_fingerprint', 'TEXT');
 ensureCol('datasets', 'seg_window_mode', 'INTEGER NOT NULL DEFAULT 0');
+ensureCol('datasets', 'scope', "TEXT NOT NULL DEFAULT 'seg-cls'");
+d.exec("UPDATE datasets SET scope = 'seg-cls' WHERE scope IS NULL OR scope = ''"); // backfill legacy
 ensureCol('runs', 'analysis_json', 'TEXT');
 ensureCol('runs', 'prompt_id', 'INTEGER');
 ensureCol('runs', 'enabled_classes_json', 'TEXT');
