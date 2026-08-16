@@ -10,7 +10,6 @@ const msg = (html, cls = '') => { $('#msg').innerHTML = html ? `<div class="box 
 
 const state = {
   view: 'home', task: 'classification', tasks: [], models: [], datasets: [], datasetId: null,
-  contextItems: [], contextId: null, prompts: [], promptId: null,
   numbersMode: localStorage.getItem('artha_numbers') || 'best', _groups: [],
 };
 
@@ -131,56 +130,11 @@ function bindBar() {
   $('#uploadGt').onclick = () => pickJson((data, fname) => uploadGt(data, fname));
   $('#addRun').onclick = () => pickJson((data, fname) => addRun(data, fname));
   $('#manualRun').onclick = manualRun;
-  $('#newPrompt').onclick = newPrompt;
   $('#docSave').onclick = saveDoc;
   $('#docEditor').addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveDoc(); }
     $('#docStatus').className = 'gt'; // mark dirty (drop the saved-green)
   });
-  $('#context').onchange = (e) => { state.contextId = Number(e.target.value) || null; loadPrompts().then(refresh); };
-  $('#prompt').onchange = (e) => { state.promptId = Number(e.target.value) || null; };
-}
-
-// Context selector = extraction Template (extraction_type) or classification Profile.
-async function loadContext() {
-  const wrap = $('#ctxLabel'), sel = $('#context');
-  if (state.task === 'extraction') {
-    $('#ctxName').textContent = 'Template';
-    state.contextItems = await api('/api/extraction-types').catch(() => []);
-  } else if (state.task === 'classification') {
-    $('#ctxName').textContent = 'Profile';
-    state.contextItems = await api('/api/classifier-profiles').catch(() => []);
-  } else { state.contextItems = []; }
-  if (!state.contextItems.length && state.task !== 'extraction' && state.task !== 'classification') { wrap.hidden = true; state.contextId = null; return; }
-  wrap.hidden = false;
-  const none = state.task === 'extraction' ? '— all templates —' : '— none —';
-  sel.innerHTML = `<option value="">${none}</option>` +
-    state.contextItems.map((it) => `<option value="${it.id}">${it.name}${it.n_classes != null ? ` (${it.n_classes})` : ''}</option>`).join('');
-  if (state.contextId && !state.contextItems.some((it) => it.id === state.contextId)) state.contextId = null;
-  sel.value = state.contextId || '';
-}
-
-async function loadPrompts() {
-  const sel = $('#prompt');
-  let url = `/api/prompts?task=${state.task}`;
-  if (state.task === 'extraction' && state.contextId) url += `&extraction_type_id=${state.contextId}`;
-  state.prompts = await api(url).catch(() => []);
-  sel.innerHTML = '<option value="">— no prompt —</option>' +
-    state.prompts.map((p) => `<option value="${p.id}">${p.name}${p.version ? ` ${p.version}` : ''}</option>`).join('');
-  if (state.promptId && !state.prompts.some((p) => p.id === state.promptId)) state.promptId = null;
-  sel.value = state.promptId || '';
-}
-
-async function newPrompt() {
-  const name = prompt('Prompt name:'); if (!name) return;
-  const version = prompt('Version (optional, e.g. v1):') || null;
-  const text = prompt('Paste the prompt text:'); if (!text) return;
-  const body = { task: state.task, name, version, text };
-  if (state.task === 'extraction' && state.contextId) body.extraction_type_id = state.contextId;
-  try {
-    const p = await api('/api/prompts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    state.promptId = p.id; await loadPrompts(); msg(`Prompt <code>${p.name}</code> saved.`, 'ok');
-  } catch (e) { msg(e.message, 'err'); }
 }
 
 // --- file picker helper: reads a JSON file, hands back parsed content ---
@@ -225,9 +179,6 @@ async function addRun(data, fname) {
   if (!model) return;
   const predictions = data.predictions || data;
   const payload = { task: state.task, dataset_id: state.datasetId, model_config_id: model, predictions };
-  if (state.promptId) payload.prompt_id = state.promptId;
-  if (state.task === 'extraction' && state.contextId) payload.extraction_type_id = state.contextId;
-  if (state.task === 'classification' && state.contextId) payload.profile_id = state.contextId;
   try {
     const res = await api('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     msg(`Scored <code>${fname}</code> — ${res.headline.key} = <b>${res.headline.value}</b> (coverage: ${res.coverage}).`, 'ok');
@@ -269,8 +220,6 @@ function pickModel() {
 
 async function refresh() {
   renderDatasets(); // re-filter the dataset dropdown to the current task's group
-  await loadContext();
-  await loadPrompts();
   // GT status line
   if (state.datasetId) {
     const gt = await api(`/api/datasets/${state.datasetId}/gt`).catch(() => ({}));
@@ -280,9 +229,7 @@ async function refresh() {
     el.className = 'gt' + (c ? ' ok' : '');
   } else $('#gtStatus').textContent = '';
 
-  let runs = state.datasetId ? await api(`/api/leaderboard?task=${state.task}&dataset_id=${state.datasetId}`) : [];
-  // Extraction: a chosen template filters the board to that doc-type's runs.
-  if (state.task === 'extraction' && state.contextId) runs = runs.filter((r) => r.extraction_type_id === state.contextId);
+  const runs = state.datasetId ? await api(`/api/leaderboard?task=${state.task}&dataset_id=${state.datasetId}`) : [];
   renderBoard(runs);
 }
 
