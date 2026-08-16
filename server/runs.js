@@ -99,7 +99,7 @@ export function createRun(d, params) {
 
   const model = d.prepare('SELECT id, name FROM model_configs WHERE id = ?').get(modelId);
   if (!model) return { ok: false, code: 'unknown_model', message: `unknown model_config_id "${modelId}"` };
-  const dataset = d.prepare('SELECT id, name FROM datasets WHERE id = ?').get(datasetId);
+  const dataset = d.prepare('SELECT id, name, seg_window_mode FROM datasets WHERE id = ?').get(datasetId);
   if (!dataset) return { ok: false, code: 'unknown_dataset', message: 'dataset not found' };
 
   // Dedup: the same external run must not be ingested twice.
@@ -143,6 +143,7 @@ export function createRun(d, params) {
   }
   const scoredGt = cov.full ? gt : Object.fromEntries(gtIds.filter((id) => predictions[id] != null).map((id) => [id, gt[id]]));
   const opts = scoringOpts(d, task, { profileId, extractionTypeId });
+  if (task === 'segmentation') opts.windowMode = !!dataset.seg_window_mode;
   const result = scoreTask(task, predictions, scoredGt, opts);
   // Freeze the enabled class set onto the run (classification): so a later-grown master list can be
   // compared against exactly what THIS run was enabled for.

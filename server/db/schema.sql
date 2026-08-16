@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS datasets (
   n_applicants    INTEGER,                    -- e.g. 5
   n_docs          INTEGER,                    -- e.g. 250
   source_manifest TEXT,                       -- path/URL to the S3-links JSON manifest
+  seg_window_mode INTEGER NOT NULL DEFAULT 0, -- 1 = segmentation bundles are sliding WINDOWS (stream slices):
+                                              -- score literal start/continue at EVERY page (no forced first-page
+                                              -- start), so boundary_recall == "START recall" over all gold starts
   notes           TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -1,0 +1,302 @@
+[
+  {
+    "code": "aadhar_card",
+    "label": "aadhar_card",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "aadhar_front",
+    "label": "aadhar_front",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "aadhar_back",
+    "label": "aadhar_back",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "aadhar_udyog",
+    "label": "aadhar_udyog",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "pan_card",
+    "label": "pan_card",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "voter_id_front",
+    "label": "voter_id_front",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "voter_id_back",
+    "label": "voter_id_back",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "voter_id",
+    "label": "voter_id",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "driving_license",
+    "label": "driving_license",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "passport_front",
+    "label": "passport_front",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "passport_back",
+    "label": "passport_back",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "passport",
+    "label": "passport",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "uae_resident_id",
+    "label": "uae_resident_id",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "employee_id_card",
+    "label": "employee_id_card",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "pension_card",
+    "label": "pension_card",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "other_identity_doc",
+    "label": "other_identity_doc",
+    "bucket": "identity_doc"
+  },
+  {
+    "code": "itr_individual",
+    "label": "itr_individual",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "itr_individual_full",
+    "label": "itr_individual_full",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "itr_firm",
+    "label": "itr_firm",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "itr_firm_full",
+    "label": "itr_firm_full",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "form_16",
+    "label": "form_16",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "form_16a",
+    "label": "form_16a",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "form_26AS",
+    "label": "form_26AS",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "form_AIS",
+    "label": "form_AIS",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "form_60",
+    "label": "form_60",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "tax_audit_3CA_3CD",
+    "label": "tax_audit_3CA_3CD",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "tax_audit_3CB_3CD",
+    "label": "tax_audit_3CB_3CD",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "audit_report",
+    "label": "audit_report",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "computation_sheet",
+    "label": "computation_sheet",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "income_sheet",
+    "label": "income_sheet",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "tax_challan",
+    "label": "tax_challan",
+    "bucket": "income_tax"
+  },
+  {
+    "code": "gst_certificate",
+    "label": "gst_certificate",
+    "bucket": "gst_doc"
+  },
+  {
+    "code": "gst_registration",
+    "label": "gst_registration",
+    "bucket": "gst_doc"
+  },
+  {
+    "code": "gstr_form",
+    "label": "gstr_form",
+    "bucket": "gst_doc"
+  },
+  {
+    "code": "gst_accumn_report",
+    "label": "gst_accumn_report",
+    "bucket": "gst_doc"
+  },
+  {
+    "code": "accumn_monitor_alerts",
+    "label": "accumn_monitor_alerts",
+    "bucket": "gst_doc"
+  },
+  {
+    "code": "balance_sheet",
+    "label": "balance_sheet",
+    "bucket": "financial_statement"
+  },
+  {
+    "code": "pnl_statement",
+    "label": "pnl_statement",
+    "bucket": "financial_statement"
+  },
+  {
+    "code": "combined_pnl_bs",
+    "label": "combined_pnl_bs",
+    "bucket": "financial_statement"
+  },
+  {
+    "code": "notes_to_accounts",
+    "label": "notes_to_accounts",
+    "bucket": "financial_statement"
+  },
+  {
+    "code": "schedules_and_annexures",
+    "label": "schedules_and_annexures",
+    "bucket": "financial_statement"
+  },
+  {
+    "code": "debt_sheet",
+    "label": "debt_sheet",
+    "bucket": "financial_statement"
+  },
+  {
+    "code": "other_financial_doc",
+    "label": "other_financial_doc",
+    "bucket": "financial_statement"
+  },
+  {
+    "code": "bank_statement",
+    "label": "bank_statement",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "bank_statement_of_account_SOA",
+    "label": "bank_statement_of_account_SOA",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "statement_of_account",
+    "label": "statement_of_account",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "bank_cheque",
+    "label": "bank_cheque",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "NACH_form",
+    "label": "NACH_form",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "bank_signature_verification",
+    "label": "bank_signature_verification",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "cibil_individual",
+    "label": "cibil_individual",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "cibil_commercial",
+    "label": "cibil_commercial",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "bureau_crif_docs",
+    "label": "bureau_crif_docs",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "upi_transaction_statement",
+    "label": "upi_transaction_statement",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "loan_exposure_summary",
+    "label": "loan_exposure_summary",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "other_bank_credit_doc",
+    "label": "other_bank_credit_doc",
+    "bucket": "bank_credit_doc"
+  },
+  {
+    "code": "other_loan_doc",
+    "label": "other_loan_doc",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "other_property_doc",
+    "label": "other_property_doc",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "other_business_reg_doc",
+    "label": "other_business_reg_doc",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "other_utility_kyc_doc",
+    "label": "other_utility_kyc_doc",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "other_doc",
+    "label": "other_doc",
+    "bucket": "other_doc"
+  }
+]

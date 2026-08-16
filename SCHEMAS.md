@@ -57,11 +57,15 @@ with its document `class`. This is the grouped form of the per-page **JSONL** th
   ]
 }
 ```
-- A **boundary** is a `start` after the first page (an internal cut). The first page is always a start.
+- A **boundary** is a `start` after the first page (an internal cut). The first page is always a start
+  — **unless the dataset is `seg_window_mode`** (bundles are sliding-window stream slices, e.g. the
+  `unified_seg_cls` windows): then page 0 is a real start/continue decision, every gold `start` counts,
+  and `boundary_recall` == the eval's **START recall**. Set `seg_window_mode:true` when creating the dataset.
 - Tag aliases accepted: `boundary`; values `s`/`c`, `begin`, `true`/`false`. Class aliases: `doc_type`,
   `doc_class`, `category`. Missing tag ⇒ treated as `continue`.
 - **Metrics:** boundary **recall** is the headline (a missed start silently merges two docs — the
   costly error), plus precision/F1, `missed_boundaries`, `spurious_boundaries`, `page_class_accuracy`,
+  **`cls_acc_at_start`** (classification accuracy on gold-start pages — the eval's cls-acc@start),
   `exact_match`.
 - Optional per-page `confidence` (aliases: `conf`, `prob`, `score`) feeds the confidence analysis.
 - **Detailed analysis** (per run, the row drop-down) is **event-sourced**: the scorer stores one

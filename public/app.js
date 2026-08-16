@@ -396,8 +396,9 @@ function renderSegDetail(run) {
 
   // Boundary + error taxonomy
   const stats = `<div class="stats">
-    <span>recall <b>${bd.recall}</b></span><span>precision <b>${bd.precision}</b></span><span>F1 <b>${bd.f1}</b></span>
+    <span>START recall <b>${bd.recall}</b></span><span>precision <b>${bd.precision}</b></span><span>F1 <b>${bd.f1}</b></span>
     <span class="bad">missed (merges) <b>${bd.fn}</b></span><span class="bad">spurious (splits) <b>${bd.fp}</b></span>
+    ${bd.cls_acc_at_start != null ? `<span>cls-acc@start <b>${bd.cls_acc_at_start}</b> <span class="muted">(${bd.n_gold_starts} starts)</span></span>` : ''}
     <span>page-class acc <b>${bd.page_class_accuracy}</b></span></div>`;
   const et = (a.error_types || []).length ? kvTable(['error type', 'count'], a.error_types.map((e) => [e.type, e.count])) : '';
   html += section('Boundary analysis', stats + et);

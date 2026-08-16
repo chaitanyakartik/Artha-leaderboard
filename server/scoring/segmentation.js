@@ -13,8 +13,10 @@ import { normalizeLabel, round } from './util.js';
 import { aggregate } from './seg_aggregate.js';
 
 const START_WORDS = new Set(['start', 's', 'begin', 'b', 'new', 'boundary', 'true', 'yes', '1']);
-function isStart(row, idx) {
-  if (idx === 0) return true; // first page of a bundle is always a segment start
+// windowMode: bundles are stream slices (sliding windows), so page 0 is a REAL start/continue
+// decision — don't force it. Document mode: page 0 always starts the doc (forced, not a boundary).
+function isStart(row, idx, windowMode) {
+  if (idx === 0 && !windowMode) return true; // doc mode: first page always a segment start
   const t = normalizeLabel(row && (row.tag ?? row.boundary ?? row.seg ?? row.type));
   return t === '' ? false : START_WORDS.has(t); // no tag -> continue
 }
@@ -35,10 +37,11 @@ function pagesOf(v) {
   if (v && Array.isArray(v.pages)) return v.pages;
   return [];
 }
-// segment (doc) class per page = class declared at the most recent start at/before the page
-function segClassByPage(pages) {
+// segment (doc) class per page = the page's own class if present, else the class declared at the
+// most recent start (prefer row class so window-leading continue pages, which carry their class, work)
+function segClassByPage(pages, windowMode) {
   const out = []; let cur = '';
-  pages.forEach((row, i) => { if (isStart(row, i)) cur = classOf(row); out[i] = cur; });
+  pages.forEach((row, i) => { const c = classOf(row); if (isStart(row, i, windowMode)) cur = c || cur; else if (c) cur = c; out[i] = c || cur; });
   return out;
 }
 // per-page class = the row's own class, forward-filled when a continue omits it
@@ -51,19 +54,21 @@ function pageClassByPage(pages) {
 // Emit one event per (bundle, page). `bucketFor(class)` maps a class -> coarse bucket (or null).
 export function extractEvents(pred, gt, opts = {}) {
   const buckets = opts.classBuckets || {};
+  const windowMode = !!opts.windowMode;
   const bucketFor = (c) => buckets[c] || null;
   const events = [];
   for (const doc_id of Object.keys(gt)) {
     const gp = pagesOf(gt[doc_id]);
     const pp = pagesOf(pred[doc_id]);
-    const gSeg = segClassByPage(gp), gPage = pageClassByPage(gp);
-    const pSeg = segClassByPage(pp), pPage = pageClassByPage(pp);
+    const gSeg = segClassByPage(gp, windowMode), gPage = pageClassByPage(gp);
+    const pSeg = segClassByPage(pp, windowMode), pPage = pageClassByPage(pp);
     for (let i = 0; i < gp.length; i++) {
-      const gStart = isStart(gp[i], i);
+      const gStart = isStart(gp[i], i, windowMode);
       const hasPred = i < pp.length;
-      const pStart = hasPred ? isStart(pp[i], i) : false; // missing pred page -> treated as continue
-      const gtBoundary = i > 0 && gStart;
-      const predBoundary = i > 0 && pStart;
+      const pStart = hasPred ? isStart(pp[i], i, windowMode) : false; // missing pred page -> continue
+      // window mode: every start is a boundary to detect (incl. page 0). doc mode: internal starts only.
+      const gtBoundary = gStart && (windowMode || i > 0);
+      const predBoundary = pStart && (windowMode || i > 0);
 
       let error_type = null;
       if (gtBoundary && !predBoundary) error_type = 'missed_start';       // merge
@@ -125,6 +130,7 @@ export function score(pred, gt, opts = {}) {
       { key: 'missed_boundaries', value: bd.fn, scope: 'overall' },
       { key: 'spurious_boundaries', value: bd.fp, scope: 'overall' },
       { key: 'page_class_accuracy', value: bd.page_class_accuracy, scope: 'overall' },
+      { key: 'cls_acc_at_start', value: bd.cls_acc_at_start, scope: 'overall' },
       { key: 'exact_match', value: nBundles ? round(exact / nBundles) : 0, scope: 'overall' },
       { key: 'n_bundles', value: nBundles, scope: 'overall' },
     ],

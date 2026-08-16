@@ -74,7 +74,7 @@ export function aggregate(events, opts = {}) {
   const cell = new Map();                 // "gt||pred" -> count  (page-level segment class)
   const gtPages = new Map(), predPages = new Map(), correctPages = new Map();
   const bCell = new Map(), gtBk = new Map(), predBk = new Map(), correctBk = new Map();
-  let pageHit = 0, pageTot = 0;
+  let pageHit = 0, pageTot = 0, startHit = 0, startTot = 0;
   for (const e of events) {
     const g = e.gt_seg_class, p = e.pred_seg_class;
     if (!g) continue;
@@ -82,6 +82,8 @@ export function aggregate(events, opts = {}) {
     inc(cell, `${g}||${p || '∅'}`);
     inc(gtPages, g); if (p) inc(predPages, p);
     pageTot++; if (g === p) { pageHit++; inc(correctPages, g); }
+    // cls-acc@start: classification accuracy on the pages GT marks as a document start
+    if (e.gt_tag === 'start') { startTot++; if (g === p) startHit++; }
     if (bucketsMapped) {
       const gb = bucketOf(g) || 'unmapped', pb = bucketOf(p) || 'unmapped';
       inc(bCell, `${gb}||${pb}`); inc(gtBk, gb); inc(predBk, pb); if (gb === pb) inc(correctBk, gb);
@@ -195,7 +197,7 @@ export function aggregate(events, opts = {}) {
     schema_version: 1,
     buckets_mapped: bucketsMapped,
     overview: { key_findings: findings, n_docs: docs.length, n_pages: pageTot },
-    boundary: { recall: b.recall, precision: b.precision, f1: b.f1, tp, fp, fn, page_class_accuracy: pageTot ? round(pageHit / pageTot) : 0 },
+    boundary: { recall: b.recall, precision: b.precision, f1: b.f1, tp, fp, fn, page_class_accuracy: pageTot ? round(pageHit / pageTot) : 0, cls_acc_at_start: startTot ? round(startHit / startTot) : null, n_gold_starts: startTot },
     error_types: [...errorTypes.entries()].map(([type, count]) => ({ type, count })).sort(desc),
     transitions: { merges, splits, class_confusion: classConfusion.slice(0, 50), bucket_merges: bucketMerges },
     confusion_matrix: { labels: [...labels].sort(), cells: Object.fromEntries([...cell.entries()].map(([k, v]) => [k, v])) },
