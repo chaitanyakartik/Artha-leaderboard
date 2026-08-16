@@ -26,7 +26,7 @@ export function score(pred, gt, opts = {}) {
     });
   }
 
-  const analysis = aggregate(items);
+  const analysis = aggregate(items, { taxonomy: opts.taxonomy });
   const metrics = [
     { key: 'accuracy', value: analysis.accuracy, scope: 'overall' },
     { key: 'macro_f1', value: analysis.macro_f1, scope: 'overall' },

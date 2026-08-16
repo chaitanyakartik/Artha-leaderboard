@@ -4,11 +4,12 @@
 // (predicted_json = pred class, gold_json = true class); every view is derived here, so
 // re-aggregation from the DB never re-scores.
 import { prf, round } from './util.js';
+import { buildCoverage } from './coverage.js';
 
 const parse = (s, d = null) => { try { return s == null ? d : JSON.parse(s); } catch { return d; } };
 const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1);
 
-export function aggregate(items) {
+export function aggregate(items, opts = {}) {
   const scored = [], stats = new Map(), predCount = new Map();
   const cell = new Map(); // "gold||pred" -> count (confusion)
   let correct = 0;
@@ -40,11 +41,17 @@ export function aggregate(items) {
   const worst = withSupport.find((c) => c.f1 < 0.9);
   if (worst) findings.push(`Weakest class: "${worst.class}" F1 ${worst.f1} (support ${worst.support}).`);
 
+  // Coverage against the master taxonomy: supported = GT support > 0 (score = F1).
+  const supported = withSupport.map((c) => ({ code: c.class, support: c.support, score: c.f1 }));
+  const seen = perClass.map((c) => c.class).filter((c) => c !== '__missed__');
+  const taxonomy_coverage = buildCoverage(supported, seen, opts.taxonomy);
+
   return {
     schema_version: 2,
     overview: { key_findings: findings, n_scored: n },
     accuracy, macro_f1: macroF1,
     per_class: perClass,
     confusion_matrix: { labels: [...stats.keys()].sort(), cells: Object.fromEntries(cell) },
+    taxonomy_coverage,
   };
 }

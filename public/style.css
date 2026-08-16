@@ -102,3 +102,17 @@ tr.runanalysis td { padding:0; }
 .matrix th { text-transform:none; font-weight:600; }
 td.diag { color:var(--good); font-weight:600; }
 td.off { color:var(--bad); }
+/* taxonomy coverage + master taxonomy viewer */
+#taxonomy { padding:16px 20px 40px; }
+.covbucket { border:1px solid var(--line); border-radius:6px; margin:6px 0; background:#0e1015; }
+.covbucket > summary { cursor:pointer; padding:7px 10px; display:flex; align-items:center; gap:10px; font-size:13px; }
+.covbucket > summary:hover { color:var(--acc); }
+.covbucket > summary .num { color:var(--mut); font-variant-numeric:tabular-nums; }
+.covbar { display:inline-block; width:90px; height:7px; background:#20242e; border-radius:4px; overflow:hidden; }
+.covbar i { display:block; height:100%; background:var(--acc); }
+.chips { display:flex; flex-wrap:wrap; gap:5px; padding:6px 10px 10px; }
+.chip { font-size:11px; padding:2px 7px; border-radius:10px; border:1px solid var(--line); color:var(--fg); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.chip.good { background:#12351d; border-color:#204a2a; color:#7bd88f; }
+.chip.ok   { background:#3a2f14; border-color:#4a3d20; color:#e3b341; }
+.chip.bad  { background:#3a1a1a; border-color:#5a2626; color:#ff9a94; }
+.chip.none { background:transparent; border-style:dashed; color:var(--mut); }

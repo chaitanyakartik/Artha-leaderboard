@@ -10,6 +10,7 @@
 //     gt_bucket, pred_bucket, gt_boundary, pred_boundary, error_type, confidence, prev_gt_class }
 //   error_type ∈ null | 'missed_start' | 'false_start' | 'wrong_class'
 import { prf, round } from './util.js';
+import { buildCoverage } from './coverage.js';
 
 const inc = (map, k, by = 1) => map.set(k, (map.get(k) || 0) + by);
 const desc = (a, b) => b.count - a.count;
@@ -193,9 +194,15 @@ export function aggregate(events, opts = {}) {
   const lenGap = segmentLength.find((s) => s.gt_count >= 2 && s.pred_avg_pages > s.gt_avg_pages * 1.5);
   if (lenGap) findings.push(`"${lenGap.class}" segments run long: ${lenGap.pred_avg_pages}p predicted vs ${lenGap.gt_avg_pages}p true (merging in neighbours).`);
 
+  // Coverage against the master taxonomy: supported = classes with GT pages (score = boundary recall,
+  // falling back to page-F1 for classes that never begin a segment in this run).
+  const supported = classAnalysis.map((c) => ({ code: c.class, support: c.gt_pages, score: c.boundary_recall ?? c.page_f1 }));
+  const taxonomy_coverage = buildCoverage(supported, [...labels], opts.taxonomy);
+
   return {
     schema_version: 1,
     buckets_mapped: bucketsMapped,
+    taxonomy_coverage,
     overview: { key_findings: findings, n_docs: docs.length, n_pages: pageTot },
     boundary: { recall: b.recall, precision: b.precision, f1: b.f1, tp, fp, fn, page_class_accuracy: pageTot ? round(pageHit / pageTot) : 0, cls_acc_at_start: startTot ? round(startHit / startTot) : null, n_gold_starts: startTot },
     error_types: [...errorTypes.entries()].map(([type, count]) => ({ type, count })).sort(desc),

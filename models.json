@@ -91,6 +91,46 @@
       "tasks": ["segmentation", "classification", "extraction"],
       "released": null,
       "notes": "Off-the-shelf instruct model, NO seg+cls finetune — larger zero-shot baseline. Loaded from /data/madhav/models/gemma-4-31B-it on box 147."
+    },
+    {
+      "id": "gemini-zeroshot",
+      "name": "Gemini (zero-shot)",
+      "kind": "single",
+      "components": ["Gemini"],
+      "base": null,
+      "tasks": ["extraction"],
+      "released": null,
+      "notes": "Zero-shot Aadhaar field extraction baseline (no finetune). Preds: results/adhaar/v8/gemini on box 147."
+    },
+    {
+      "id": "qwen35-9b-v8",
+      "name": "Qwen3.5-9B v8 (LoRA)",
+      "kind": "single",
+      "components": ["Qwen3.5-9B"],
+      "base": "Qwen3.5-9B",
+      "tasks": ["extraction"],
+      "released": null,
+      "notes": "LoRA finetune for Aadhaar extraction, v8 (exp2). Preds: results/adhaar/v8/qwen35_exp2 on box 147."
+    },
+    {
+      "id": "chandra-4b-v1",
+      "name": "Chandra-4B v1 (LoRA)",
+      "kind": "single",
+      "components": ["Chandra-OCR 4B"],
+      "base": "Chandra-OCR (CPT base)",
+      "tasks": ["extraction"],
+      "released": null,
+      "notes": "LoRA finetune for Aadhaar extraction, v1. Per-sample preds NOT saved (eval printed aggregates only) — row is aggregate-seeded."
+    },
+    {
+      "id": "chandra-4b-v2",
+      "name": "Chandra-4B v2 @200DPI",
+      "kind": "single",
+      "components": ["Chandra-OCR 4B"],
+      "base": "Chandra-OCR (CPT base)",
+      "tasks": ["extraction"],
+      "released": null,
+      "notes": "LoRA finetune @200DPI for Aadhaar extraction, v2. Per-sample preds NOT saved (eval printed aggregates only) — row is aggregate-seeded."
     }
   ]
 }

@@ -22,6 +22,11 @@ export function loadClassBuckets(d) {
   return Object.fromEntries(rows.map((r) => [normalizeLabel(r.code), r.bucket]));
 }
 
+// The master class taxonomy (code + label + bucket). Feeds per-run taxonomy-coverage.
+export function loadTaxonomy(d) {
+  return d.prepare('SELECT code, label, bucket FROM class_taxonomy').all();
+}
+
 export function loadGt(d, datasetId, task) {
   const rows = d.prepare('SELECT doc_id, gold_json FROM gt_items WHERE dataset_id = ? AND task = ?').all(datasetId, task);
   const gt = {};
@@ -46,6 +51,7 @@ function scoringOpts(d, task, { extractionTypeId }) {
     const bk = loadClassBuckets(d);
     if (Object.keys(bk).length) opts.classBuckets = bk;
   }
+  if (task === 'classification' || task === 'segmentation') opts.taxonomy = loadTaxonomy(d);
   return opts;
 }
 

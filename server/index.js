@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, ROOT } from './db.js';
-import { createRun, loadClassBuckets, loadFieldSchema } from './runs.js';
+import { createRun, loadClassBuckets, loadFieldSchema, loadTaxonomy } from './runs.js';
 import { aggregateTask } from './scoring/aggregate.js';
 import { ingestWandb } from './ingest/wandb.js';
 import { config, authConfigured } from './config.js';
@@ -269,10 +269,11 @@ app.post('/api/runs/:id/reaggregate', async (req, reply) => {
   let atomic, opts = {};
   if (run.task === 'segmentation') {
     atomic = d.prepare('SELECT * FROM analysis_events WHERE run_id = ?').all(id);
-    opts = { classBuckets: loadClassBuckets(d) };
+    opts = { classBuckets: loadClassBuckets(d), taxonomy: loadTaxonomy(d) };
   } else {
     atomic = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ?').all(id);
-    if (run.task === 'extraction') opts = { fieldSchema: loadFieldSchema(d, run.extraction_type_id) };
+    if (run.task === 'classification') opts = { taxonomy: loadTaxonomy(d) };
+    else if (run.task === 'extraction') opts = { fieldSchema: loadFieldSchema(d, run.extraction_type_id) };
   }
   if (!atomic.length) return reply.code(400).send({ error: 'no_events', message: 'this run has no stored atomic rows to re-aggregate' });
   const analysis = aggregateTask(run.task, atomic, opts);

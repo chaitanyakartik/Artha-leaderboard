@@ -38,18 +38,35 @@ function bindMenu() {
   mark();
 }
 
-// Toggle between the Home page (editable docs) and a task leaderboard.
+// Switch among: Home (editable docs) · a task leaderboard · the master Taxonomy viewer.
 function setView(view) {
   state.view = view;
   renderTabs();
-  const home = $('#home'), bar = document.querySelector('.bar'), main = document.querySelector('main');
-  if (view === 'home') {
-    home.hidden = false; bar.style.display = 'none'; main.style.display = 'none';
-    loadDoc();
-  } else {
-    home.hidden = true; bar.style.display = ''; main.style.display = '';
-    refresh();
-  }
+  const home = $('#home'), bar = document.querySelector('.bar'), main = document.querySelector('main'), tax = $('#taxonomy');
+  home.hidden = view !== 'home';
+  tax.hidden = view !== 'taxonomy';
+  bar.style.display = view === 'task' ? '' : 'none';
+  main.style.display = view === 'task' ? '' : 'none';
+  if (view === 'home') loadDoc();
+  else if (view === 'taxonomy') renderTaxonomy();
+  else refresh();
+}
+
+// The master class taxonomy, grouped by bucket. Read-only reference — the canonical list every
+// run's coverage is measured against.
+async function renderTaxonomy() {
+  const el = $('#taxonomy');
+  el.innerHTML = '<div class="home-head"><h2>Master taxonomy</h2></div><p class="muted">loading…</p>';
+  try {
+    const classes = await api('/api/classes');
+    const byBucket = new Map();
+    for (const c of classes) { const b = c.bucket || '(unbucketed)'; if (!byBucket.has(b)) byBucket.set(b, []); byBucket.get(b).push(c); }
+    const buckets = [...byBucket.entries()].sort((a, b) => b[1].length - a[1].length);
+    const body = buckets.map(([b, cs]) => `<details class="covbucket" open>
+      <summary><b>${esc(b)}</b> <span class="num">${cs.length}</span></summary>
+      <div class="chips">${cs.slice().sort((x, y) => x.code.localeCompare(y.code)).map((c) => `<span class="chip" title="${esc(c.label || c.code)}">${esc(c.code)}</span>`).join('')}</div></details>`).join('');
+    el.innerHTML = `<div class="home-head"><h2>Master taxonomy</h2><span class="gt">${classes.length} classes · ${buckets.length} buckets</span></div>${body}`;
+  } catch (e) { el.innerHTML = `<div class="home-head"><h2>Master taxonomy</h2></div><p class="drawer err">Failed to load: ${esc(e.message)}</p>`; }
 }
 
 async function mountLogout() {
@@ -77,6 +94,11 @@ function renderTabs() {
     b.onclick = () => { state.task = t.slug; setView('task'); };
     tabs.appendChild(b);
   }
+  const tax = document.createElement('button');
+  tax.textContent = 'Taxonomy';
+  tax.className = state.view === 'taxonomy' ? 'active' : '';
+  tax.onclick = () => setView('taxonomy');
+  tabs.appendChild(tax);
 }
 
 // --- home: editable models.md ---
@@ -384,6 +406,26 @@ function findingsBlock(a, tail) {
   return section('Overview', `${kf ? `<ul class="findings">${kf}</ul>` : '<p class="muted">No notable patterns.</p>'}${tail ? `<p class="muted">${tail}</p>` : ''}`);
 }
 
+// Taxonomy coverage: which file types this run has GT support for (+ how well), grouped by bucket;
+// which taxonomy classes have no support here; and any off-taxonomy labels the model emitted.
+function renderCoverage(cov) {
+  if (!cov) return '';
+  const pct = (s, t) => (t ? Math.round(100 * s / t) : 0);
+  const bar = (s, t) => `<span class="covbar"><i style="width:${pct(s, t)}%"></i></span>`;
+  const chip = (c) => {
+    const cls = !c.supported ? 'none' : (c.score == null || c.score >= 0.9 ? 'good' : c.score >= 0.6 ? 'ok' : 'bad');
+    const title = c.supported ? `support ${c.support}${c.score != null ? ` · score ${c.score}` : ''}` : 'no support in this run';
+    return `<span class="chip ${cls}" title="${title}">${esc(c.code)}${c.supported && c.score != null ? ` ${c.score}` : ''}</span>`;
+  };
+  const bucket = (bk) => `<details class="covbucket"${bk.supported ? ' open' : ''}>
+    <summary><b>${esc(bk.bucket)}</b> <span class="num">${bk.supported}/${bk.total}</span> ${bar(bk.supported, bk.total)}${bk.supported ? '' : ' <span class="muted">no support</span>'}</summary>
+    <div class="chips">${bk.classes.map(chip).join('')}</div></details>`;
+  const off = (cov.off_taxonomy || []).length
+    ? `<p class="bad">⚠ off-taxonomy labels (not in master taxonomy): ${cov.off_taxonomy.map((o) => `<code>${esc(o.code)}</code>${o.support ? ` ×${o.support}` : ''}`).join('  ')}</p>` : '';
+  const head = `<p class="muted"><b>${cov.n_classes_supported}/${cov.n_classes_total}</b> classes · <b>${cov.n_buckets_touched}/${cov.n_buckets_total}</b> buckets exercised in this run</p>`;
+  return section('Taxonomy coverage (file types)', head + cov.buckets.map(bucket).join('') + off);
+}
+
 // Dispatch by analysis shape: segmentation / extraction / classification / (none → offenders).
 function renderDetail(run) {
   const a = run.analysis;
@@ -398,6 +440,7 @@ function renderClassDetail(run) {
   let html = reaggTools(run);
   html += findingsBlock(a, `${a.overview.n_scored} scored`);
   html += `<div class="stats"><span>accuracy <b>${a.accuracy}</b></span><span>macro-F1 <b>${a.macro_f1}</b></span></div>`;
+  html += renderCoverage(a.taxonomy_coverage);
   // per-class (worst first)
   if ((a.per_class || []).length) {
     const rows = a.per_class.map((c) => [c.class, c.precision, c.recall, c.f1, c.support, c.n_pred]);
@@ -410,13 +453,14 @@ function renderClassDetail(run) {
 
 function renderExtractionDetail(run) {
   const a = run.analysis;
+  const na = (x) => (x == null ? 'n/a' : x);
   let html = reaggTools(run);
   html += findingsBlock(a, `${a.overview.n_docs} docs · ${a.overview.n_fields} fields`);
   html += `<div class="stats">
-    <span>field acc (micro) <b>${a.field_accuracy}</b></span><span>field acc (macro) <b>${a.macro_field_accuracy}</b></span>
-    <span>char-sim (micro) <b>${a.micro_char_sim}</b></span><span>char-sim (macro) <b>${a.macro_char_sim}</b></span>
-    <span>doc-exact <b>${a.doc_exact_match}</b></span></div>`;
-  const rows = (a.per_field || []).map((f) => [f.field, f.accuracy, f.support, f.char_sim]);
+    <span>field acc (micro) <b>${na(a.field_accuracy)}</b></span><span>field acc (macro) <b>${na(a.macro_field_accuracy)}</b></span>
+    <span>char-sim (micro) <b>${na(a.micro_char_sim)}</b></span><span>char-sim (macro) <b>${na(a.macro_char_sim)}</b></span>
+    <span>doc-exact <b>${na(a.doc_exact_match)}</b></span></div>`;
+  const rows = (a.per_field || []).map((f) => [f.field, na(f.accuracy), na(f.support), na(f.char_sim)]);
   html += section('Field-wise (accuracy · support · char-sim)', kvTable(['field', 'accuracy', 'support (#docs)', 'char-sim'], rows));
   html += offenders(run);
   return html;
@@ -439,6 +483,7 @@ function renderSegDetail(run) {
     <span>page-class acc <b>${bd.page_class_accuracy}</b></span></div>`;
   const et = (a.error_types || []).length ? kvTable(['error type', 'count'], a.error_types.map((e) => [e.type, e.count])) : '';
   html += section('Boundary analysis', stats + et);
+  html += renderCoverage(a.taxonomy_coverage);
 
   // Transitions
   html += section('Segment transitions', `<div class="misses-grid">
