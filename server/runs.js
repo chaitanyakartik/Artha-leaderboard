@@ -29,16 +29,6 @@ export function loadGt(d, datasetId, task) {
   return gt;
 }
 
-// The full class taxonomy (master list). Grows over time — enabled/disabled is measured against it.
-export function masterClasses(d) {
-  return d.prepare('SELECT code FROM class_taxonomy ORDER BY code').all().map((r) => r.code);
-}
-// A profile's class codes (the enabled/trained subset).
-export function profileClasses(d, profileId) {
-  return d.prepare(
-    'SELECT c.code FROM profile_classes pc JOIN class_taxonomy c ON c.id = pc.class_id WHERE pc.profile_id = ?'
-  ).all(profileId).map((r) => r.code);
-}
 // An extraction type's field schema ([{name,type}]).
 export function loadFieldSchema(d, typeId) {
   if (!typeId) return null;
@@ -46,12 +36,8 @@ export function loadFieldSchema(d, typeId) {
   return et?.field_schema ? JSON.parse(et.field_schema) : null;
 }
 
-function scoringOpts(d, task, { profileId, extractionTypeId }) {
+function scoringOpts(d, task, { extractionTypeId }) {
   const opts = {};
-  if (task === 'classification') {
-    if (profileId) opts.profileClasses = profileClasses(d, profileId);
-    opts.master = masterClasses(d);
-  }
   if (task === 'extraction' && extractionTypeId) {
     const schema = loadFieldSchema(d, extractionTypeId);
     if (schema) opts.fieldSchema = schema;
@@ -70,13 +56,13 @@ function insertRunRow(d, base, fields) {
       const run_key = makeRunKey(base);
       const info = d.prepare(
         `INSERT INTO runs (run_key, display_name, task, dataset_id, model_config_id,
-                           extraction_type_id, classifier_profile_id, predictions_path,
+                           extraction_type_id, predictions_path,
                            coverage_status, coverage_missing, source, origin, external_ref,
-                           gt_fingerprint, analysis_json, prompt_id, enabled_classes_json, checkpoint, notes)
+                           gt_fingerprint, analysis_json, prompt_id, checkpoint, notes)
          VALUES (@run_key, @display_name, @task, @dataset_id, @model_config_id,
-                 @extraction_type_id, @classifier_profile_id, @predictions_path,
+                 @extraction_type_id, @predictions_path,
                  @coverage_status, @coverage_missing, @source, @origin, @external_ref,
-                 @gt_fingerprint, @analysis_json, @prompt_id, @enabled_classes_json, @checkpoint, @notes)`
+                 @gt_fingerprint, @analysis_json, @prompt_id, @checkpoint, @notes)`
       ).run({ run_key, ...fields });
       return { run_id: info.lastInsertRowid, run_key };
     } catch (e) {
@@ -88,13 +74,13 @@ function insertRunRow(d, base, fields) {
 
 // params: { task, datasetId, modelId, origin='ui', externalRef=null, notes=null,
 //           predictions=null, manualMetrics=null, override=false,
-//           profileId=null, extractionTypeId=null, promptId=null, date=new Date() }
+//           extractionTypeId=null, promptId=null, date=new Date() }
 // Returns a discriminated result: { ok:true, ... } or { ok:false, code, message, ... }.
 export function createRun(d, params) {
   const {
     task, datasetId, modelId, origin = 'ui', externalRef = null, notes = null,
     predictions = null, manualMetrics = null, override = false,
-    profileId = null, extractionTypeId = null, promptId = null, checkpoint = null, date = new Date(),
+    extractionTypeId = null, promptId = null, checkpoint = null, date = new Date(),
   } = params;
 
   const model = d.prepare('SELECT id, name FROM model_configs WHERE id = ?').get(modelId);
@@ -115,10 +101,10 @@ export function createRun(d, params) {
     const tx = d.transaction(() => {
       const { run_id } = insertRunRow(d, base, {
         display_name: base, task, dataset_id: datasetId, model_config_id: modelId,
-        extraction_type_id: extractionTypeId, classifier_profile_id: profileId,
+        extraction_type_id: extractionTypeId,
         predictions_path: null, coverage_status: 'manual', coverage_missing: 0,
         source: 'manual', origin, external_ref: externalRef, gt_fingerprint: null,
-        analysis_json: null, prompt_id: promptId, enabled_classes_json: null, checkpoint, notes,
+        analysis_json: null, prompt_id: promptId, checkpoint, notes,
       });
       const mStmt = d.prepare('INSERT INTO run_metrics (run_id, key, value, scope) VALUES (?, ?, ?, ?)');
       for (const [k, v] of Object.entries(manualMetrics)) mStmt.run(run_id, k, Number(v), 'overall');
@@ -142,22 +128,19 @@ export function createRun(d, params) {
     };
   }
   const scoredGt = cov.full ? gt : Object.fromEntries(gtIds.filter((id) => predictions[id] != null).map((id) => [id, gt[id]]));
-  const opts = scoringOpts(d, task, { profileId, extractionTypeId });
+  const opts = scoringOpts(d, task, { extractionTypeId });
   if (task === 'segmentation') opts.windowMode = !!dataset.seg_window_mode;
   const result = scoreTask(task, predictions, scoredGt, opts);
-  // Freeze the enabled class set onto the run (classification): so a later-grown master list can be
-  // compared against exactly what THIS run was enabled for.
-  const enabledSnapshot = task === 'classification' && opts.profileClasses ? JSON.stringify(opts.profileClasses) : null;
 
   const tx = d.transaction(() => {
     const { run_id } = insertRunRow(d, base, {
       display_name: base, task, dataset_id: datasetId, model_config_id: modelId,
-      extraction_type_id: extractionTypeId, classifier_profile_id: profileId,
+      extraction_type_id: extractionTypeId,
       predictions_path: null, coverage_status: cov.full ? 'full' : 'partial',
       coverage_missing: cov.missing.length, source: 'upload', origin, external_ref: externalRef,
       gt_fingerprint: gtFingerprint(gt),
       analysis_json: result.analysis ? JSON.stringify(result.analysis) : null,
-      prompt_id: promptId, enabled_classes_json: enabledSnapshot, checkpoint, notes,
+      prompt_id: promptId, checkpoint, notes,
     });
     const predPath = path.join(UPLOAD_DIR, `run-${run_id}.json`);
     fs.writeFileSync(predPath, JSON.stringify(predictions));

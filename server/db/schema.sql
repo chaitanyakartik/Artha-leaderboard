@@ -41,18 +41,6 @@ CREATE TABLE IF NOT EXISTS class_taxonomy (
                                              -- feeds segmentation's bucket-level "popular misses"; NULL until the schema lands
 );
 
--- What a given classifier was trained for = a subset of the 140 classes.
-CREATE TABLE IF NOT EXISTS classifier_profiles (
-  id     INTEGER PRIMARY KEY AUTOINCREMENT,
-  name   TEXT NOT NULL UNIQUE,
-  notes  TEXT
-);
-CREATE TABLE IF NOT EXISTS profile_classes (
-  profile_id INTEGER NOT NULL REFERENCES classifier_profiles(id) ON DELETE CASCADE,
-  class_id   INTEGER NOT NULL REFERENCES class_taxonomy(id) ON DELETE CASCADE,
-  PRIMARY KEY (profile_id, class_id)
-);
-
 -- Extraction doc-type variants; each carries its own field schema.
 CREATE TABLE IF NOT EXISTS extraction_types (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,7 +84,6 @@ CREATE TABLE IF NOT EXISTS runs (
   dataset_id            INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
   model_config_id       TEXT NOT NULL REFERENCES model_configs(id),
   extraction_type_id    INTEGER REFERENCES extraction_types(id),      -- extraction only
-  classifier_profile_id INTEGER REFERENCES classifier_profiles(id),   -- classification only
   predictions_path      TEXT,                -- stored upload; NULL for manual-entry rows
   coverage_status       TEXT,                -- full | partial | manual
   coverage_missing      INTEGER DEFAULT 0,   -- # GT doc_ids not covered by predictions
@@ -106,7 +93,6 @@ CREATE TABLE IF NOT EXISTS runs (
   gt_fingerprint        TEXT,                -- GT hash at scoring time (auto-ingest "GT matches" check)
   analysis_json         TEXT,                -- rich per-run analysis (e.g. segmentation "popular misses"); drives the run drill-down
   prompt_id             INTEGER REFERENCES prompts(id),        -- the prompt this run used
-  enabled_classes_json  TEXT,                -- classification: frozen snapshot of the classes the model was enabled/trained for
   checkpoint            TEXT,                -- which training artifact of the model_config (e.g. "ckpt-1200"); per-run, not in the id
   notes                 TEXT,
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))

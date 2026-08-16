@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Classification + Extraction + Prompts smoke. Usage: bash samples/smoke_ce.sh [port]
 # Run against a server on a FRESH db (npm run db:init). Imports the sample taxonomies first, so the
-# classifier profile + extraction template have something to reference.
+# extraction template has a field schema to reference.
 set -e
 P="${1:-5186}"; B="http://localhost:$P"; J=$(mktemp)
 py(){ python3 -c "$1"; }
@@ -16,16 +16,16 @@ node scripts/import-extraction-types.js samples/extraction-types.sample.json
 login
 DSID=$(post /api/datasets '{"name":"CE","n_docs":6}' | py 'import sys,json;print(json.load(sys.stdin)["id"])')
 
-echo "== CLASSIFICATION: enabled-subset profile, out-of-scope class, per-class + confusion =="
-PID=$(post /api/classifier-profiles '{"name":"kyc+fin","classes":["aadhaar","pan","bank_statement","salary_slip"]}' | py 'import sys,json;print(json.load(sys.stdin)["id"])')
+echo "== CLASSIFICATION: scored against all GT classes, per-class + confusion, prompt reference =="
 CP=$(post /api/prompts '{"task":"classification","name":"cls-basic","version":"v1","text":"Classify the doc."}' | py 'import sys,json;print(json.load(sys.stdin)["id"])')
 post "/api/datasets/$DSID/gt" '{"task":"classification","gt":{"d1":"aadhaar","d2":"pan","d3":"bank_statement","d4":"bank_statement","d5":"salary_slip","d6":"itr"}}' >/dev/null
-CID=$(post /api/runs '{"task":"classification","dataset_id":'"$DSID"',"model_config_id":"gemini-only","profile_id":'"$PID"',"prompt_id":'"$CP"',"predictions":{"d1":"aadhaar","d2":"aadhaar","d3":"bank_statement","d4":"salary_slip","d5":"salary_slip","d6":"itr"}}' | py 'import sys,json;print(json.load(sys.stdin)["run_id"])')
+CID=$(post /api/runs '{"task":"classification","dataset_id":'"$DSID"',"model_config_id":"gemini-only","prompt_id":'"$CP"',"predictions":{"d1":"aadhaar","d2":"aadhaar","d3":"bank_statement","d4":"salary_slip","d5":"salary_slip","d6":"itr"}}' | py 'import sys,json;print(json.load(sys.stdin)["run_id"])')
 get "/api/runs/$CID" | py '
 import sys,json;r=json.load(sys.stdin);a=r["analysis"]
-assert a["overview"]["n_out_of_scope"]==1, a["overview"]
-assert a["enabled"]["count"]==4 and a["disabled"]["count"]==3, (a["enabled"],a["disabled"])
-print("  accuracy=%s macro_f1=%s enabled=%d/%d disabled=%s prompt=%s"%(a["accuracy"],a["macro_f1"],a["enabled"]["count"],a["enabled"]["master_count"],a["disabled"]["classes"],r["prompt_name"]))
+assert a["overview"]["n_scored"]==6, a["overview"]
+assert abs(a["accuracy"]-0.6667)<1e-3, a["accuracy"]
+assert "enabled" not in a and "disabled" not in a, "profile machinery should be gone"
+print("  accuracy=%s macro_f1=%s n_scored=%d prompt=%s"%(a["accuracy"],a["macro_f1"],a["overview"]["n_scored"],r["prompt_name"]))
 print("  worst class:",a["per_class"][0]["class"],"F1",a["per_class"][0]["f1"])'
 
 echo "== EXTRACTION: template, field support, macro vs micro, char-sim =="
@@ -41,6 +41,6 @@ print("  micro=%s macro=%s micro_charsim=%s doc_exact=%s"%(a["field_accuracy"],a
 print("  supports:",{k:v["support"] for k,v in fields.items()})'
 
 echo "== RE-AGGREGATE both from item_results (no re-score) =="
-post "/api/runs/$CID/reaggregate" '{}' | py 'import sys,json;a=json.load(sys.stdin)["analysis"];print("  cls: accuracy=%s enabled=%d/%d"%(a["accuracy"],a["enabled"]["count"],a["enabled"]["master_count"]))'
+post "/api/runs/$CID/reaggregate" '{}' | py 'import sys,json;a=json.load(sys.stdin)["analysis"];print("  cls: accuracy=%s macro_f1=%s"%(a["accuracy"],a["macro_f1"]))'
 post "/api/runs/$EID/reaggregate" '{}' | py 'import sys,json;a=json.load(sys.stdin)["analysis"];print("  ext: micro=%s macro=%s"%(a["field_accuracy"],a["macro_field_accuracy"]))'
 echo "ALL CE CHECKS PASSED"

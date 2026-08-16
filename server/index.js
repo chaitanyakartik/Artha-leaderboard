@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, ROOT } from './db.js';
-import { createRun, loadClassBuckets, masterClasses, loadFieldSchema } from './runs.js';
+import { createRun, loadClassBuckets, loadFieldSchema } from './runs.js';
 import { aggregateTask } from './scoring/aggregate.js';
 import { ingestWandb } from './ingest/wandb.js';
 import { config, authConfigured } from './config.js';
@@ -78,32 +78,8 @@ app.get('/api/models', async () =>
   d.prepare('SELECT id, name, notes, card_json FROM model_configs ORDER BY name').all()
     .map((m) => ({ id: m.id, name: m.name, notes: m.notes, card: m.card_json ? JSON.parse(m.card_json) : null })));
 
-// The master class taxonomy (grows over time; profiles + enabled/disabled reference it).
+// The class taxonomy + coarse buckets (buckets feed segmentation's bucket-level views).
 app.get('/api/classes', async () => d.prepare('SELECT code, label, bucket FROM class_taxonomy ORDER BY code').all());
-
-// Classifier profiles = named enabled subsets of the master list (classification).
-app.get('/api/classifier-profiles', async () => {
-  const profs = d.prepare('SELECT * FROM classifier_profiles ORDER BY name').all();
-  const cnt = d.prepare('SELECT COUNT(*) c FROM profile_classes WHERE profile_id = ?');
-  for (const p of profs) p.n_classes = cnt.get(p.id).c;
-  return profs;
-});
-app.post('/api/classifier-profiles', async (req, reply) => {
-  const { name, classes = [], notes } = req.body || {};
-  if (!name) return reply.code(400).send({ error: 'name required' });
-  try {
-    const tx = d.transaction(() => {
-      const pid = d.prepare('INSERT INTO classifier_profiles (name, notes) VALUES (?, ?)').run(name, notes ?? null).lastInsertRowid;
-      const sel = d.prepare('SELECT id FROM class_taxonomy WHERE code = ?');
-      const link = d.prepare('INSERT OR IGNORE INTO profile_classes (profile_id, class_id) VALUES (?, ?)');
-      let linked = 0; const missing = [];
-      for (const code of classes) { const c = sel.get(String(code)); if (c) { link.run(pid, c.id); linked++; } else missing.push(code); }
-      return { pid, linked, missing };
-    });
-    const { pid, linked, missing } = tx();
-    return { id: pid, name, n_classes: linked, missing_codes: missing };
-  } catch (e) { return reply.code(400).send({ error: String(e.message || e) }); }
-});
 
 // Extraction doc-type templates (each with a field schema).
 app.get('/api/extraction-types', async () => d.prepare('SELECT * FROM extraction_types ORDER BY name').all());
@@ -200,7 +176,7 @@ function sendResult(reply, res) {
 
 // ---- runs (score a predictions file) --------------------------------------
 // Body: { task, dataset_id, model_config_id, predictions: {doc_id: value},
-//         profile_id?, extraction_type_id?, override?, notes? }
+//         extraction_type_id?, prompt_id?, checkpoint?, override?, notes? }
 app.post('/api/runs', async (req, reply) => {
   const b = req.body || {};
   if (!TASKS.includes(b.task)) return reply.code(400).send({ error: 'bad task' });
@@ -208,7 +184,7 @@ app.post('/api/runs', async (req, reply) => {
   return sendResult(reply, createRun(d, {
     task: b.task, datasetId: Number(b.dataset_id), modelId: b.model_config_id,
     predictions: b.predictions, override: b.override,
-    profileId: b.profile_id, extractionTypeId: b.extraction_type_id, promptId: b.prompt_id,
+    extractionTypeId: b.extraction_type_id, promptId: b.prompt_id,
     checkpoint: b.checkpoint, notes: b.notes,
   }));
 });
@@ -268,8 +244,6 @@ app.get('/api/runs/:id', async (req, reply) => {
   if (!run) return reply.code(404).send({ error: 'not found' });
   if (run.analysis_json) run.analysis = JSON.parse(run.analysis_json);
   delete run.analysis_json;
-  if (run.enabled_classes_json) run.enabled_classes = JSON.parse(run.enabled_classes_json);
-  delete run.enabled_classes_json;
   run.metrics = d.prepare('SELECT key, value, scope FROM run_metrics WHERE run_id = ?').all(id);
   run.items = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ? LIMIT 2000').all(id);
   return run;
@@ -289,7 +263,7 @@ app.get('/api/runs/:id/events', async (req) => {
 // segmentation re-aggregates from analysis_events; classification/extraction from item_results.
 app.post('/api/runs/:id/reaggregate', async (req, reply) => {
   const id = Number(req.params.id);
-  const run = d.prepare('SELECT id, task, extraction_type_id, enabled_classes_json FROM runs WHERE id = ?').get(id);
+  const run = d.prepare('SELECT id, task, extraction_type_id FROM runs WHERE id = ?').get(id);
   if (!run) return reply.code(404).send({ error: 'not found' });
 
   let atomic, opts = {};
@@ -298,8 +272,7 @@ app.post('/api/runs/:id/reaggregate', async (req, reply) => {
     opts = { classBuckets: loadClassBuckets(d) };
   } else {
     atomic = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ?').all(id);
-    if (run.task === 'classification') opts = { master: masterClasses(d), enabled: run.enabled_classes_json ? JSON.parse(run.enabled_classes_json) : null };
-    else if (run.task === 'extraction') opts = { fieldSchema: loadFieldSchema(d, run.extraction_type_id) };
+    if (run.task === 'extraction') opts = { fieldSchema: loadFieldSchema(d, run.extraction_type_id) };
   }
   if (!atomic.length) return reply.code(400).send({ error: 'no_events', message: 'this run has no stored atomic rows to re-aggregate' });
   const analysis = aggregateTask(run.task, atomic, opts);

@@ -27,10 +27,20 @@ ensureCol('datasets', 'scope', "TEXT NOT NULL DEFAULT 'seg-cls'");
 d.exec("UPDATE datasets SET scope = 'seg-cls' WHERE scope IS NULL OR scope = ''"); // backfill legacy
 ensureCol('runs', 'analysis_json', 'TEXT');
 ensureCol('runs', 'prompt_id', 'INTEGER');
-ensureCol('runs', 'enabled_classes_json', 'TEXT');
 ensureCol('runs', 'checkpoint', 'TEXT');
 ensureCol('class_taxonomy', 'bucket', 'TEXT');
 d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_external ON runs(origin, external_ref) WHERE external_ref IS NOT NULL`);
+
+// Rip out the classifier-profile machinery from older DBs (kept extraction templates + class buckets).
+// Idempotent: DROP COLUMN / DROP TABLE only fire when the leftover still exists.
+const dropColIf = (table, col) => {
+  const cols = d.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (cols.includes(col)) d.exec(`ALTER TABLE ${table} DROP COLUMN ${col}`);
+};
+dropColIf('runs', 'classifier_profile_id');
+dropColIf('runs', 'enabled_classes_json');
+d.exec('DROP TABLE IF EXISTS profile_classes');
+d.exec('DROP TABLE IF EXISTS classifier_profiles');
 
 // Sync model registry from the root models.json (the verified list of model ids + cards).
 const registry = JSON.parse(fs.readFileSync(path.join(ROOT, 'models.json'), 'utf8'));

@@ -393,23 +393,15 @@ function renderDetail(run) {
   const a = run.analysis;
   if (a && a.boundary) return renderSegDetail(run);
   if (a && a.per_field) return renderExtractionDetail(run);
-  if (a && (a.per_class || a.enabled)) return renderClassDetail(run);
+  if (a && a.per_class) return renderClassDetail(run);
   return offenders(run) || '<p class="muted">No detailed analysis for this run.</p>';
 }
 
 function renderClassDetail(run) {
   const a = run.analysis;
   let html = reaggTools(run);
-  html += findingsBlock(a, `${a.overview.n_scored} scored · ${a.overview.n_out_of_scope} out of scope`);
-  html += `<div class="stats"><span>accuracy <b>${a.accuracy}</b></span><span>macro-F1 <b>${a.macro_f1}</b></span>
-    <span>enabled <b>${a.enabled.count ?? '?'}/${a.enabled.master_count || '?'}</b></span></div>`;
-  // enabled vs disabled
-  const dis = a.disabled.classes || [], unt = a.enabled.untested || [];
-  html += section('Enabled vs disabled classes', `
-    <p><b>${(a.enabled.classes || []).length}</b> enabled${a.enabled.classes?.length ? `: ${a.enabled.classes.map((c) => `<code>${esc(c)}</code>`).join(' ')}` : ''}</p>
-    <p class="${dis.length ? 'bad' : 'muted'}"><b>${dis.length}</b> NOT enabled in this run${dis.length ? `: ${dis.map((c) => `<code>${esc(c)}</code>`).join(' ')}` : ''}</p>
-    ${unt.length ? `<p class="muted">Enabled but untested here (no GT docs): ${unt.map((c) => `<code>${esc(c)}</code>`).join(' ')}</p>` : ''}
-    ${a.enabled.count == null ? '<p class="muted">No profile chosen — scored against all GT classes.</p>' : ''}`);
+  html += findingsBlock(a, `${a.overview.n_scored} scored`);
+  html += `<div class="stats"><span>accuracy <b>${a.accuracy}</b></span><span>macro-F1 <b>${a.macro_f1}</b></span></div>`;
   // per-class (worst first)
   if ((a.per_class || []).length) {
     const rows = a.per_class.map((c) => [c.class, c.precision, c.recall, c.f1, c.support, c.n_pred]);
