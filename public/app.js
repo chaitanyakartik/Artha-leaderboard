@@ -288,25 +288,21 @@ function toggleGroup(btn, metricKeys) {
 
 function renderRunList(g, metricKeys) {
   const runs = [...g.runs].sort(byLatest);
-  const head = `<tr><th>run</th><th>ckpt</th>${metricKeys.map((c) => `<th>${c}</th>`).join('')}<th>cov</th><th>when</th><th></th></tr>`;
+  const head = `<tr><th>run</th><th>ckpt</th>${metricKeys.map((c) => `<th>${c}</th>`).join('')}<th>cov</th><th>when</th></tr>`;
   const body = runs.map((r) => {
     const cells = metricKeys.map((c) => `<td class="num">${r.metrics[c] ?? '—'}</td>`).join('');
     const cov = `<span class="badge ${r.coverage_status}">${r.coverage_status}${r.coverage_missing ? ` −${r.coverage_missing}` : ''}</span>`;
     const when = (r.created_at || '').replace('T', ' ').slice(0, 16);
     const label = r.checkpoint || r.display_name || ('run ' + r.id);
     const sub = r.prompt_name ? `<div class="rowsub">✎ ${r.prompt_name}${r.prompt_version ? ' ' + r.prompt_version : ''}</div>` : '';
-    return `<tr><td><button class="runview" data-id="${r.id}">▸ ${label}</button>${sub}</td><td>${r.checkpoint || '—'}</td>${cells}<td>${cov}</td><td class="num">${when}</td><td><button class="del" data-id="${r.id}">✕</button></td></tr>
-            <tr class="runanalysis" id="ra-${r.id}" hidden><td colspan="${metricKeys.length + 5}"></td></tr>`;
+    return `<tr><td><button class="runview" data-id="${r.id}">▸ ${label}</button>${sub}</td><td>${r.checkpoint || '—'}</td>${cells}<td>${cov}</td><td class="num">${when}</td></tr>
+            <tr class="runanalysis" id="ra-${r.id}" hidden><td colspan="${metricKeys.length + 4}"></td></tr>`;
   }).join('');
   return `<div class="runlist"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 
 function bindRunList(c) {
   c.querySelectorAll('.runview').forEach((b) => b.onclick = () => toggleRunAnalysis(b));
-  c.querySelectorAll('.del').forEach((b) => b.onclick = async () => {
-    if (!confirm('Delete this run?')) return;
-    await api(`/api/runs/${b.dataset.id}`, { method: 'DELETE' }); refresh();
-  });
 }
 
 // Level 2: expand a run → the detailed analysis drawer.
