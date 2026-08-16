@@ -8,8 +8,18 @@
 </head>
 <body>
   <header>
+    <button id="menuBtn" class="menu-btn" title="Settings" aria-label="Settings">☰</button>
     <h1>Artha Leaderboard</h1>
     <div class="sub">predictions in &rarr; scored against ground truth &rarr; on the board</div>
+    <div id="menu" class="menu" hidden>
+      <div class="menu-title">Settings</div>
+      <div class="menu-row">
+        <span>Numbers next to model</span>
+        <span class="seg-toggle" id="numbersToggle">
+          <button class="tg" data-mode="best">Best run</button><button class="tg" data-mode="latest">Latest run</button>
+        </span>
+      </div>
+    </div>
   </header>
 
   <nav id="tabs"></nav>
@@ -26,7 +36,6 @@
     </label>
     <span id="gtStatus" class="gt"></span>
     <div class="spacer"></div>
-    <button id="newProfile" hidden>+ Profile</button>
     <button id="newPrompt">+ Prompt</button>
     <button id="newDataset">+ Dataset</button>
     <button id="uploadGt">Upload GT</button>

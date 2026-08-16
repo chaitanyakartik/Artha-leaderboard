@@ -1,9 +1,18 @@
 :root { --bg:#0f1115; --panel:#171a21; --line:#262b36; --fg:#e6e9ef; --mut:#8b93a3; --acc:#5b8cff; --good:#3fb950; --bad:#f85149; }
 * { box-sizing: border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-header { padding:18px 20px 8px; }
+header { padding:18px 20px 8px; position:relative; }
 h1 { margin:0; font-size:20px; }
 .sub { color:var(--mut); font-size:12px; }
+.menu-btn { position:absolute; top:16px; right:18px; background:none; border:none; color:var(--mut); font-size:20px; padding:4px 8px; cursor:pointer; }
+.menu-btn:hover { color:var(--fg); }
+.menu { position:absolute; top:44px; right:18px; z-index:20; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; min-width:260px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+.menu-title { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); margin-bottom:10px; }
+.menu-row { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; }
+.seg-toggle { display:inline-flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; }
+.seg-toggle .tg { background:var(--bg); color:var(--mut); border:none; padding:5px 10px; font-size:12px; cursor:pointer; }
+.seg-toggle .tg.on { background:var(--acc); color:#fff; }
+.thmode { color:var(--acc); font-weight:600; text-transform:none; letter-spacing:0; }
 nav { display:flex; gap:4px; padding:0 20px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
 nav button { background:none; border:none; color:var(--mut); padding:10px 14px; cursor:pointer; border-bottom:2px solid transparent; font-size:14px; }
 nav button.active { color:var(--fg); border-bottom-color:var(--acc); }
@@ -72,6 +81,14 @@ tr.detail td { padding:0; border-bottom:1px solid var(--line); white-space:norma
   font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size:2; }
 .doc-editor:focus { outline:none; border-color:var(--acc); }
 .hint { color:var(--mut); font-size:12px; margin-top:8px; }
+/* run list (model config → its runs) */
+.runlist { padding:10px 12px; background:#0b0d11; }
+.runlist table { min-width:0; }
+.runlist th, .runlist td { padding:6px 10px; }
+.runlist .runview { background:none; border:none; color:var(--fg); padding:0; font:inherit; cursor:pointer; }
+.runlist .runview:hover { color:var(--acc); }
+tr.runanalysis:hover td { background:transparent; }
+tr.runanalysis td { padding:0; }
 .drawer-tools { margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .drawer-tools .reagg { font-size:12px; padding:4px 9px; }
 .sec { border:1px solid var(--line); border-radius:6px; margin:8px 0; background:#0e1015; }

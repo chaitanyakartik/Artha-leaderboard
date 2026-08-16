@@ -11,6 +11,7 @@ const msg = (html, cls = '') => { $('#msg').innerHTML = html ? `<div class="box 
 const state = {
   view: 'home', task: 'classification', tasks: [], models: [], datasets: [], datasetId: null,
   contextItems: [], contextId: null, prompts: [], promptId: null,
+  numbersMode: localStorage.getItem('artha_numbers') || 'best', _groups: [],
 };
 
 async function boot() {
@@ -20,8 +21,22 @@ async function boot() {
   renderTabs();
   renderDatasets();
   bindBar();
+  bindMenu();
   mountLogout();
   setView('home');
+}
+
+// Hamburger settings menu.
+function bindMenu() {
+  const btn = $('#menuBtn'), menu = $('#menu');
+  btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; };
+  document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) menu.hidden = true; });
+  const mark = () => $('#numbersToggle').querySelectorAll('.tg').forEach((b) => b.classList.toggle('on', b.dataset.mode === state.numbersMode));
+  $('#numbersToggle').querySelectorAll('.tg').forEach((b) => b.onclick = () => {
+    state.numbersMode = b.dataset.mode; localStorage.setItem('artha_numbers', state.numbersMode); mark();
+    if (state.view === 'task') refresh();
+  });
+  mark();
 }
 
 // Toggle between the Home page (editable docs) and a task leaderboard.
@@ -111,7 +126,6 @@ function bindBar() {
   $('#addRun').onclick = () => pickJson((data, fname) => addRun(data, fname));
   $('#manualRun').onclick = manualRun;
   $('#newPrompt').onclick = newPrompt;
-  $('#newProfile').onclick = newProfile;
   $('#docSave').onclick = saveDoc;
   $('#docEditor').addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveDoc(); }
@@ -124,7 +138,6 @@ function bindBar() {
 // Context selector = extraction Template (extraction_type) or classification Profile.
 async function loadContext() {
   const wrap = $('#ctxLabel'), sel = $('#context');
-  $('#newProfile').hidden = state.task !== 'classification';
   if (state.task === 'extraction') {
     $('#ctxName').textContent = 'Template';
     state.contextItems = await api('/api/extraction-types').catch(() => []);
@@ -161,17 +174,6 @@ async function newPrompt() {
   try {
     const p = await api('/api/prompts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     state.promptId = p.id; await loadPrompts(); msg(`Prompt <code>${p.name}</code> saved.`, 'ok');
-  } catch (e) { msg(e.message, 'err'); }
-}
-
-async function newProfile() {
-  const name = prompt('Profile name (e.g. kyc-only):'); if (!name) return;
-  const codes = prompt('Enabled class codes, comma-separated:');
-  const classes = (codes || '').split(',').map((s) => s.trim()).filter(Boolean);
-  try {
-    const p = await api('/api/classifier-profiles', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, classes }) });
-    state.contextId = p.id; await loadContext();
-    msg(`Profile <code>${p.name}</code>: ${p.n_classes} classes${p.missing_codes.length ? `, ${p.missing_codes.length} unknown (${p.missing_codes.join(', ')})` : ''}.`, p.missing_codes.length ? 'err' : 'ok');
   } catch (e) { msg(e.message, 'err'); }
 }
 
@@ -276,6 +278,19 @@ async function refresh() {
   renderBoard(runs);
 }
 
+// The headline metric per task (used to rank models + pick the "best" run).
+const HEADLINE = { segmentation: 'boundary_recall', classification: 'accuracy', extraction: 'field_accuracy', segregation: 'ari' };
+const byLatest = (a, b) => (b.created_at || '').localeCompare(a.created_at || '');
+
+// Which run's numbers show on the collapsed model row — best (by headline) or latest.
+function pickDisplayRun(runs) {
+  if (state.numbersMode === 'latest') return [...runs].sort(byLatest)[0];
+  const k = HEADLINE[state.task];
+  return [...runs].sort((a, b) => ((b.metrics[k] ?? -1) - (a.metrics[k] ?? -1)) || byLatest(a, b))[0];
+}
+
+// Board = one row per MODEL CONFIG (its best/latest numbers). Expand → that model's runs.
+// Expand a run → the detailed analysis drawer.
 function renderBoard(runs) {
   const thead = $('#board thead'), tbody = $('#board tbody');
   if (!runs.length) {
@@ -283,34 +298,66 @@ function renderBoard(runs) {
     return;
   }
   const metricKeys = [...new Set(runs.flatMap((r) => Object.keys(r.metrics)))].sort();
-  thead.innerHTML = `<tr><th>Model config</th>${metricKeys.map((k) => `<th>${k}</th>`).join('')}<th>Coverage</th><th>When</th><th></th></tr>`;
-  const span = metricKeys.length + 4; // for the full-width detail row
-  tbody.innerHTML = runs.map((r) => {
-    const cells = metricKeys.map((k) => `<td class="num">${r.metrics[k] ?? '—'}</td>`).join('');
+  const groups = new Map();
+  for (const r of runs) {
+    if (!groups.has(r.model_config_id)) groups.set(r.model_config_id, { name: r.model_name, runs: [] });
+    groups.get(r.model_config_id).runs.push(r);
+  }
+  const k = HEADLINE[state.task];
+  const ordered = [...groups.values()].map((g) => ({ ...g, disp: pickDisplayRun(g.runs) }))
+    .sort((a, b) => (b.disp.metrics[k] ?? -1) - (a.disp.metrics[k] ?? -1));
+  state._groups = ordered;
+
+  const span = metricKeys.length + 4;
+  thead.innerHTML = `<tr><th>Model config <span class="thmode">· ${state.numbersMode}</span></th>${metricKeys.map((c) => `<th>${c}</th>`).join('')}<th>ckpt</th><th>runs</th><th>when</th></tr>`;
+  tbody.innerHTML = ordered.map((g, gi) => {
+    const d = g.disp;
+    const cells = metricKeys.map((c) => `<td class="num">${d.metrics[c] ?? '—'}</td>`).join('');
+    const when = (d.created_at || '').replace('T', ' ').slice(0, 16);
+    const name = `<button class="expand" data-g="${gi}">▸ ${g.name}</button>`;
+    return `<tr data-grow="${gi}"><td>${name}</td>${cells}<td>${d.checkpoint || '—'}</td><td class="num">${g.runs.length}</td><td class="num">${when}</td></tr>
+            <tr class="detail" id="grp-${gi}" hidden><td colspan="${span}"></td></tr>`;
+  }).join('');
+  tbody.querySelectorAll('.expand').forEach((b) => b.onclick = () => toggleGroup(b, metricKeys));
+}
+
+// Level 1: expand a model config → list its runs.
+function toggleGroup(btn, metricKeys) {
+  const gi = btn.dataset.g, row = $(`#grp-${gi}`);
+  if (!row.hidden) { row.hidden = true; btn.textContent = btn.textContent.replace('▾', '▸'); return; }
+  btn.textContent = btn.textContent.replace('▸', '▾');
+  row.hidden = false;
+  row.firstElementChild.innerHTML = renderRunList(state._groups[gi], metricKeys);
+  bindRunList(row.firstElementChild);
+}
+
+function renderRunList(g, metricKeys) {
+  const runs = [...g.runs].sort(byLatest);
+  const head = `<tr><th>run</th><th>ckpt</th>${metricKeys.map((c) => `<th>${c}</th>`).join('')}<th>cov</th><th>when</th><th></th></tr>`;
+  const body = runs.map((r) => {
+    const cells = metricKeys.map((c) => `<td class="num">${r.metrics[c] ?? '—'}</td>`).join('');
     const cov = `<span class="badge ${r.coverage_status}">${r.coverage_status}${r.coverage_missing ? ` −${r.coverage_missing}` : ''}</span>`;
     const when = (r.created_at || '').replace('T', ' ').slice(0, 16);
-    const tags = [];
-    if (r.checkpoint) tags.push(`⑃ ${r.checkpoint}`);
-    if (r.extraction_type_name) tags.push(`▦ ${r.extraction_type_name}`);
-    if (r.prompt_name) tags.push(`✎ ${r.prompt_name}${r.prompt_version ? ' ' + r.prompt_version : ''}`);
-    const sub = tags.length ? `<div class="rowsub">${tags.join(' · ')}</div>` : '';
-    const name = `<button class="expand" data-id="${r.id}" title="${r.display_name || ''}">▸ ${r.model_name}</button>${sub}`;
-    return `<tr data-row="${r.id}"><td>${name}</td>${cells}<td>${cov}</td><td class="num">${when}</td><td><button class="del" data-id="${r.id}">✕</button></td></tr>
-            <tr class="detail" id="detail-${r.id}" hidden><td colspan="${span}"></td></tr>`;
+    const label = r.checkpoint || r.display_name || ('run ' + r.id);
+    const sub = r.prompt_name ? `<div class="rowsub">✎ ${r.prompt_name}${r.prompt_version ? ' ' + r.prompt_version : ''}</div>` : '';
+    return `<tr><td><button class="runview" data-id="${r.id}">▸ ${label}</button>${sub}</td><td>${r.checkpoint || '—'}</td>${cells}<td>${cov}</td><td class="num">${when}</td><td><button class="del" data-id="${r.id}">✕</button></td></tr>
+            <tr class="runanalysis" id="ra-${r.id}" hidden><td colspan="${metricKeys.length + 5}"></td></tr>`;
   }).join('');
-  tbody.querySelectorAll('.del').forEach((b) => b.onclick = async () => {
+  return `<div class="runlist"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+function bindRunList(c) {
+  c.querySelectorAll('.runview').forEach((b) => b.onclick = () => toggleRunAnalysis(b));
+  c.querySelectorAll('.del').forEach((b) => b.onclick = async () => {
     if (!confirm('Delete this run?')) return;
     await api(`/api/runs/${b.dataset.id}`, { method: 'DELETE' }); refresh();
   });
-  tbody.querySelectorAll('.expand').forEach((b) => b.onclick = () => toggleDetail(b));
 }
 
-// --- run drill-down: fetch full detail, render the "popular misses" analysis ---
-async function toggleDetail(btn) {
-  const id = btn.dataset.id;
-  const row = $(`#detail-${id}`);
-  const open = !row.hidden;
-  if (open) { row.hidden = true; btn.textContent = btn.textContent.replace('▾', '▸'); return; }
+// Level 2: expand a run → the detailed analysis drawer.
+async function toggleRunAnalysis(btn) {
+  const id = btn.dataset.id, row = $(`#ra-${id}`);
+  if (!row.hidden) { row.hidden = true; btn.textContent = btn.textContent.replace('▾', '▸'); return; }
   btn.textContent = btn.textContent.replace('▸', '▾');
   row.hidden = false;
   const cell = row.firstElementChild;
