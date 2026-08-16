@@ -61,6 +61,16 @@
       "tasks": ["segmentation", "classification", "extraction"],
       "released": null,
       "notes": "In-house full fine-tune on the unified seg+cls task. Checkpoint captured per-run (e.g. ckpt-1200)."
+    },
+    {
+      "id": "gemma-12b",
+      "name": "Gemma-4 12B",
+      "kind": "single",
+      "components": ["Gemma-4 12B (LoRA)"],
+      "base": "google/gemma-4-12B-it",
+      "tasks": ["segmentation", "classification", "extraction"],
+      "released": null,
+      "notes": "LoRA fine-tune (unified seg+cls, v3). Checkpoint per-run (ckpt-300/600). Base loaded from the unsloth mirror on box 147."
     }
   ]
 }

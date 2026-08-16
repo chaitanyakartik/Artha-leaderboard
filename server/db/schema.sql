@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS runs (
   analysis_json         TEXT,                -- rich per-run analysis (e.g. segmentation "popular misses"); drives the run drill-down
   prompt_id             INTEGER REFERENCES prompts(id),        -- the prompt this run used
   enabled_classes_json  TEXT,                -- classification: frozen snapshot of the classes the model was enabled/trained for
+  checkpoint            TEXT,                -- which training artifact of the model_config (e.g. "ckpt-1200"); per-run, not in the id
   notes                 TEXT,
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -290,6 +290,7 @@ function renderBoard(runs) {
     const cov = `<span class="badge ${r.coverage_status}">${r.coverage_status}${r.coverage_missing ? ` −${r.coverage_missing}` : ''}</span>`;
     const when = (r.created_at || '').replace('T', ' ').slice(0, 16);
     const tags = [];
+    if (r.checkpoint) tags.push(`⑃ ${r.checkpoint}`);
     if (r.extraction_type_name) tags.push(`▦ ${r.extraction_type_name}`);
     if (r.prompt_name) tags.push(`✎ ${r.prompt_name}${r.prompt_version ? ' ' + r.prompt_version : ''}`);
     const sub = tags.length ? `<div class="rowsub">${tags.join(' · ')}</div>` : '';

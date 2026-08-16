@@ -206,7 +206,8 @@ app.post('/api/runs', async (req, reply) => {
   return sendResult(reply, createRun(d, {
     task: b.task, datasetId: Number(b.dataset_id), modelId: b.model_config_id,
     predictions: b.predictions, override: b.override,
-    profileId: b.profile_id, extractionTypeId: b.extraction_type_id, promptId: b.prompt_id, notes: b.notes,
+    profileId: b.profile_id, extractionTypeId: b.extraction_type_id, promptId: b.prompt_id,
+    checkpoint: b.checkpoint, notes: b.notes,
   }));
 });
 
