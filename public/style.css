@@ -63,6 +63,15 @@ tr.detail td { padding:0; border-bottom:1px solid var(--line); white-space:norma
 .muted { color:var(--mut); }
 .muted code { background:#171a21; }
 .rowsub { font-size:11px; color:var(--mut); margin-top:2px; }
+/* home page: editable models.md */
+#home { padding:16px 20px 40px; }
+.home-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.home-head h2 { margin:0; font-size:18px; }
+.doc-editor { width:100%; min-height:62vh; resize:vertical; background:#0b0d11; color:var(--fg);
+  border:1px solid var(--line); border-radius:8px; padding:14px 16px;
+  font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size:2; }
+.doc-editor:focus { outline:none; border-color:var(--acc); }
+.hint { color:var(--mut); font-size:12px; margin-top:8px; }
 .drawer-tools { margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .drawer-tools .reagg { font-size:12px; padding:4px 9px; }
 .sec { border:1px solid var(--line); border-radius:6px; margin:8px 0; background:#0e1015; }

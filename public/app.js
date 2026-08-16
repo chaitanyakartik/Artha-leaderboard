@@ -9,7 +9,7 @@ const api = async (url, opts) => {
 const msg = (html, cls = '') => { $('#msg').innerHTML = html ? `<div class="box ${cls}">${html}</div>` : ''; };
 
 const state = {
-  task: 'classification', tasks: [], models: [], datasets: [], datasetId: null,
+  view: 'home', task: 'classification', tasks: [], models: [], datasets: [], datasetId: null,
   contextItems: [], contextId: null, prompts: [], promptId: null,
 };
 
@@ -21,7 +21,21 @@ async function boot() {
   renderDatasets();
   bindBar();
   mountLogout();
-  await refresh();
+  setView('home');
+}
+
+// Toggle between the Home page (editable docs) and a task leaderboard.
+function setView(view) {
+  state.view = view;
+  renderTabs();
+  const home = $('#home'), bar = document.querySelector('.bar'), main = document.querySelector('main');
+  if (view === 'home') {
+    home.hidden = false; bar.style.display = 'none'; main.style.display = 'none';
+    loadDoc();
+  } else {
+    home.hidden = true; bar.style.display = ''; main.style.display = '';
+    refresh();
+  }
 }
 
 async function mountLogout() {
@@ -35,14 +49,41 @@ async function mountLogout() {
 }
 
 function renderTabs() {
-  $('#tabs').innerHTML = '';
+  const tabs = $('#tabs');
+  tabs.innerHTML = '';
+  const home = document.createElement('button');
+  home.textContent = 'Home';
+  home.className = state.view === 'home' ? 'active' : '';
+  home.onclick = () => setView('home');
+  tabs.appendChild(home);
   for (const t of state.tasks) {
     const b = document.createElement('button');
     b.textContent = t.label;
-    b.className = t.slug === state.task ? 'active' : '';
-    b.onclick = () => { state.task = t.slug; renderTabs(); refresh(); };
-    $('#tabs').appendChild(b);
+    b.className = state.view === 'task' && t.slug === state.task ? 'active' : '';
+    b.onclick = () => { state.task = t.slug; setView('task'); };
+    tabs.appendChild(b);
   }
+}
+
+// --- home: editable models.md ---
+async function loadDoc() {
+  const ed = $('#docEditor');
+  ed.value = ''; ed.placeholder = 'Loading…';
+  try {
+    const d = await api('/api/docs/models');
+    ed.value = d.content;
+    $('#docStatus').textContent = `${d.content.length} chars`;
+  } catch (e) { ed.placeholder = 'Failed to load: ' + e.message; }
+}
+async function saveDoc() {
+  const btn = $('#docSave'), content = $('#docEditor').value;
+  btn.disabled = true; $('#docStatus').textContent = 'saving…';
+  try {
+    const r = await api('/api/docs/models', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content }) });
+    $('#docStatus').textContent = `saved · ${r.bytes} chars`;
+    $('#docStatus').className = 'gt ok';
+  } catch (e) { $('#docStatus').textContent = 'save failed: ' + e.message; $('#docStatus').className = 'gt'; }
+  finally { btn.disabled = false; }
 }
 
 function renderDatasets() {
@@ -71,6 +112,11 @@ function bindBar() {
   $('#manualRun').onclick = manualRun;
   $('#newPrompt').onclick = newPrompt;
   $('#newProfile').onclick = newProfile;
+  $('#docSave').onclick = saveDoc;
+  $('#docEditor').addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveDoc(); }
+    $('#docStatus').className = 'gt'; // mark dirty (drop the saved-green)
+  });
   $('#context').onchange = (e) => { state.contextId = Number(e.target.value) || null; loadPrompts().then(refresh); };
   $('#prompt').onchange = (e) => { state.promptId = Number(e.target.value) || null; };
 }

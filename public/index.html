@@ -35,6 +35,18 @@
   </section>
 
   <div id="msg"></div>
+
+  <section id="home" hidden>
+    <div class="home-head">
+      <h2>models.md</h2>
+      <span id="docStatus" class="gt"></span>
+      <div class="spacer"></div>
+      <button id="docSave" class="primary">Save</button>
+    </div>
+    <textarea id="docEditor" class="doc-editor" spellcheck="false" placeholder="Loading…"></textarea>
+    <div class="hint">Edits save to <code>models.md</code> in the repo. ⌘/Ctrl+S also saves.</div>
+  </section>
+
   <main><table id="board"><thead></thead><tbody></tbody></table></main>
 
   <input type="file" id="filePicker" accept="application/json" hidden />

@@ -51,6 +51,16 @@
       "tasks": ["segmentation", "classification", "extraction"],
       "released": null,
       "notes": "CPT base; LoRA adapters fine-tuned on top. The in-house track."
+    },
+    {
+      "id": "chandra-4b-ft",
+      "name": "Chandra-4B full-FT",
+      "kind": "single",
+      "components": ["Chandra-OCR 4B (Qwen3.5 backbone)"],
+      "base": "Chandra-OCR (CPT base)",
+      "tasks": ["segmentation", "classification", "extraction"],
+      "released": null,
+      "notes": "In-house full fine-tune on the unified seg+cls task. Checkpoint captured per-run (e.g. ckpt-1200)."
     }
   ]
 }

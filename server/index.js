@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, ROOT } from './db.js';
@@ -50,6 +51,25 @@ app.post('/api/logout', async (req, reply) => {
 });
 
 app.get('/api/me', async (req) => ({ user: req.user || null, auth: authConfigured() }));
+
+// ---- editable docs (home page) --------------------------------------------
+// Whitelisted, editable text files. Add entries here to expose more on the home page.
+const DOCS = { models: path.join(ROOT, 'models.md') };
+app.get('/api/docs/:name', async (req, reply) => {
+  const p = DOCS[req.params.name];
+  if (!p) return reply.code(404).send({ error: 'unknown doc' });
+  let content = '';
+  try { content = fs.readFileSync(p, 'utf8'); } catch { content = ''; }
+  return { name: req.params.name, content };
+});
+app.put('/api/docs/:name', async (req, reply) => {
+  const p = DOCS[req.params.name];
+  if (!p) return reply.code(404).send({ error: 'unknown doc' });
+  const { content } = req.body || {};
+  if (typeof content !== 'string') return reply.code(400).send({ error: 'content string required' });
+  fs.writeFileSync(p, content);
+  return { ok: true, name: req.params.name, bytes: content.length };
+});
 
 // ---- reference data -------------------------------------------------------
 app.get('/api/health', async () => ({ ok: true }));
