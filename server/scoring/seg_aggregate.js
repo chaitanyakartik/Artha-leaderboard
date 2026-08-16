@@ -194,10 +194,10 @@ export function aggregate(events, opts = {}) {
   const lenGap = segmentLength.find((s) => s.gt_count >= 2 && s.pred_avg_pages > s.gt_avg_pages * 1.5);
   if (lenGap) findings.push(`"${lenGap.class}" segments run long: ${lenGap.pred_avg_pages}p predicted vs ${lenGap.gt_avg_pages}p true (merging in neighbours).`);
 
-  // Coverage against the master taxonomy: supported = classes with GT pages (score = boundary recall,
-  // falling back to page-F1 for classes that never begin a segment in this run).
-  const supported = classAnalysis.map((c) => ({ code: c.class, support: c.gt_pages, score: c.boundary_recall ?? c.page_f1 }));
-  const taxonomy_coverage = buildCoverage(supported, [...labels], opts.taxonomy);
+  // Coverage vs the master taxonomy. Support is DECLARED (opts.supportedClasses), never inferred;
+  // `tested` is what this eval's GT exercised (score = boundary recall, falling back to page-F1).
+  const tested = classAnalysis.map((c) => ({ code: c.class, support: c.gt_pages, score: c.boundary_recall ?? c.page_f1 }));
+  const taxonomy_coverage = buildCoverage(opts.supportedClasses ?? null, tested, [...labels], opts.taxonomy);
 
   return {
     schema_version: 1,

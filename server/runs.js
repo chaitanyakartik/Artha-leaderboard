@@ -64,11 +64,11 @@ function insertRunRow(d, base, fields) {
         `INSERT INTO runs (run_key, display_name, task, dataset_id, model_config_id,
                            extraction_type_id, predictions_path,
                            coverage_status, coverage_missing, source, origin, external_ref,
-                           gt_fingerprint, analysis_json, prompt_id, checkpoint, notes)
+                           gt_fingerprint, analysis_json, prompt_id, supported_classes_json, checkpoint, notes)
          VALUES (@run_key, @display_name, @task, @dataset_id, @model_config_id,
                  @extraction_type_id, @predictions_path,
                  @coverage_status, @coverage_missing, @source, @origin, @external_ref,
-                 @gt_fingerprint, @analysis_json, @prompt_id, @checkpoint, @notes)`
+                 @gt_fingerprint, @analysis_json, @prompt_id, @supported_classes_json, @checkpoint, @notes)`
       ).run({ run_key, ...fields });
       return { run_id: info.lastInsertRowid, run_key };
     } catch (e) {
@@ -86,8 +86,10 @@ export function createRun(d, params) {
   const {
     task, datasetId, modelId, origin = 'ui', externalRef = null, notes = null,
     predictions = null, manualMetrics = null, override = false,
-    extractionTypeId = null, promptId = null, checkpoint = null, date = new Date(),
+    extractionTypeId = null, promptId = null, checkpoint = null,
+    supportedClasses = null, date = new Date(),
   } = params;
+  const supportedJson = Array.isArray(supportedClasses) ? JSON.stringify(supportedClasses) : null;
 
   const model = d.prepare('SELECT id, name FROM model_configs WHERE id = ?').get(modelId);
   if (!model) return { ok: false, code: 'unknown_model', message: `unknown model_config_id "${modelId}"` };
@@ -110,7 +112,7 @@ export function createRun(d, params) {
         extraction_type_id: extractionTypeId,
         predictions_path: null, coverage_status: 'manual', coverage_missing: 0,
         source: 'manual', origin, external_ref: externalRef, gt_fingerprint: null,
-        analysis_json: null, prompt_id: promptId, checkpoint, notes,
+        analysis_json: null, prompt_id: promptId, supported_classes_json: supportedJson, checkpoint, notes,
       });
       const mStmt = d.prepare('INSERT INTO run_metrics (run_id, key, value, scope) VALUES (?, ?, ?, ?)');
       for (const [k, v] of Object.entries(manualMetrics)) mStmt.run(run_id, k, Number(v), 'overall');
@@ -136,6 +138,7 @@ export function createRun(d, params) {
   const scoredGt = cov.full ? gt : Object.fromEntries(gtIds.filter((id) => predictions[id] != null).map((id) => [id, gt[id]]));
   const opts = scoringOpts(d, task, { extractionTypeId });
   if (task === 'segmentation') opts.windowMode = !!dataset.seg_window_mode;
+  if (supportedClasses) opts.supportedClasses = supportedClasses; // DECLARED support (never inferred)
   const result = scoreTask(task, predictions, scoredGt, opts);
 
   const tx = d.transaction(() => {
@@ -146,7 +149,7 @@ export function createRun(d, params) {
       coverage_missing: cov.missing.length, source: 'upload', origin, external_ref: externalRef,
       gt_fingerprint: gtFingerprint(gt),
       analysis_json: result.analysis ? JSON.stringify(result.analysis) : null,
-      prompt_id: promptId, checkpoint, notes,
+      prompt_id: promptId, supported_classes_json: supportedJson, checkpoint, notes,
     });
     const predPath = path.join(UPLOAD_DIR, `run-${run_id}.json`);
     fs.writeFileSync(predPath, JSON.stringify(predictions));

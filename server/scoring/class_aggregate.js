@@ -41,10 +41,11 @@ export function aggregate(items, opts = {}) {
   const worst = withSupport.find((c) => c.f1 < 0.9);
   if (worst) findings.push(`Weakest class: "${worst.class}" F1 ${worst.f1} (support ${worst.support}).`);
 
-  // Coverage against the master taxonomy: supported = GT support > 0 (score = F1).
-  const supported = withSupport.map((c) => ({ code: c.class, support: c.support, score: c.f1 }));
+  // Coverage vs the master taxonomy. Support is DECLARED (opts.supportedClasses), never inferred;
+  // `tested` is what this eval's GT actually exercised (score = F1).
+  const tested = withSupport.map((c) => ({ code: c.class, support: c.support, score: c.f1 }));
   const seen = perClass.map((c) => c.class).filter((c) => c !== '__missed__');
-  const taxonomy_coverage = buildCoverage(supported, seen, opts.taxonomy);
+  const taxonomy_coverage = buildCoverage(opts.supportedClasses ?? null, tested, seen, opts.taxonomy);
 
   return {
     schema_version: 2,

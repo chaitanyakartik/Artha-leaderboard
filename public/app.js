@@ -406,24 +406,34 @@ function findingsBlock(a, tail) {
   return section('Overview', `${kf ? `<ul class="findings">${kf}</ul>` : '<p class="muted">No notable patterns.</p>'}${tail ? `<p class="muted">${tail}</p>` : ''}`);
 }
 
-// Taxonomy coverage: which file types this run has GT support for (+ how well), grouped by bucket;
-// which taxonomy classes have no support here; and any off-taxonomy labels the model emitted.
+// Taxonomy coverage: which file types the run DECLARES support for (never inferred), grouped by
+// bucket, cross-referenced with what the eval actually tested (+ score). Flags conflicts
+// (tested-but-undeclared) and off-taxonomy labels.
 function renderCoverage(cov) {
   if (!cov) return '';
+  const off = (cov.off_taxonomy || []).length
+    ? `<p class="bad">⚠ off-taxonomy labels (not in master taxonomy): ${cov.off_taxonomy.map((o) => `<code>${esc(o.code)}</code>${o.support ? ` ×${o.support}` : ''}`).join('  ')}</p>` : '';
+  if (cov.undeclared) {
+    return section('Taxonomy coverage (file types)',
+      `<p class="muted">This run didn't declare which file types it supports, so coverage isn't shown — support is never inferred from the eval data. Declare <code>supported_classes</code> at ingest (or PATCH the run) to light this up.</p>${off}`);
+  }
   const pct = (s, t) => (t ? Math.round(100 * s / t) : 0);
   const bar = (s, t) => `<span class="covbar"><i style="width:${pct(s, t)}%"></i></span>`;
   const chip = (c) => {
-    const cls = !c.supported ? 'none' : (c.score == null || c.score >= 0.9 ? 'good' : c.score >= 0.6 ? 'ok' : 'bad');
-    const title = c.supported ? `support ${c.support}${c.score != null ? ` · score ${c.score}` : ''}` : 'no support in this run';
-    return `<span class="chip ${cls}" title="${title}">${esc(c.code)}${c.supported && c.score != null ? ` ${c.score}` : ''}</span>`;
+    let cls, title, suffix = '';
+    if (!c.declared) { cls = 'none'; title = 'not declared — model does not claim this file type'; }
+    else if (!c.tested) { cls = 'decl'; title = 'declared supported, but this eval had no examples'; suffix = ' ·'; }
+    else { cls = c.score == null || c.score >= 0.9 ? 'good' : c.score >= 0.6 ? 'ok' : 'bad'; title = `declared · tested · score ${c.score}`; suffix = c.score != null ? ` ${c.score}` : ''; }
+    return `<span class="chip ${cls}" title="${title}">${esc(c.code)}${suffix}</span>`;
   };
-  const bucket = (bk) => `<details class="covbucket"${bk.supported ? ' open' : ''}>
-    <summary><b>${esc(bk.bucket)}</b> <span class="num">${bk.supported}/${bk.total}</span> ${bar(bk.supported, bk.total)}${bk.supported ? '' : ' <span class="muted">no support</span>'}</summary>
+  const bucket = (bk) => `<details class="covbucket"${bk.declared ? ' open' : ''}>
+    <summary><b>${esc(bk.bucket)}</b> <span class="num">${bk.declared}/${bk.total} declared</span> ${bar(bk.declared, bk.total)}${bk.declared ? '' : ' <span class="muted">none supported</span>'}</summary>
     <div class="chips">${bk.classes.map(chip).join('')}</div></details>`;
-  const off = (cov.off_taxonomy || []).length
-    ? `<p class="bad">⚠ off-taxonomy labels (not in master taxonomy): ${cov.off_taxonomy.map((o) => `<code>${esc(o.code)}</code>${o.support ? ` ×${o.support}` : ''}`).join('  ')}</p>` : '';
-  const head = `<p class="muted"><b>${cov.n_classes_supported}/${cov.n_classes_total}</b> classes · <b>${cov.n_buckets_touched}/${cov.n_buckets_total}</b> buckets exercised in this run</p>`;
-  return section('Taxonomy coverage (file types)', head + cov.buckets.map(bucket).join('') + off);
+  const conflicts = (cov.conflicts || []).length
+    ? `<p class="bad">⚠ tested but NOT declared supported: ${cov.conflicts.map((o) => `<code>${esc(o.code)}</code>${o.support ? ` ×${o.support}` : ''}`).join('  ')}</p>` : '';
+  const head = `<p class="muted"><b>${cov.n_declared}/${cov.n_classes_total}</b> classes declared supported · <b>${cov.n_buckets_declared}/${cov.n_buckets_total}</b> buckets · <b>${cov.n_tested}</b> exercised by this eval</p>`;
+  const legend = `<p class="hint">colored = declared &amp; tested (green≥0.9 · amber≥0.6 · red) · dashed-blue = declared but untested here · grey = not supported</p>`;
+  return section('Taxonomy coverage (file types)', head + legend + cov.buckets.map(bucket).join('') + conflicts + off);
 }
 
 // Dispatch by analysis shape: segmentation / extraction / classification / (none → offenders).

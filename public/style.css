@@ -115,4 +115,5 @@ td.off { color:var(--bad); }
 .chip.good { background:#12351d; border-color:#204a2a; color:#7bd88f; }
 .chip.ok   { background:#3a2f14; border-color:#4a3d20; color:#e3b341; }
 .chip.bad  { background:#3a1a1a; border-color:#5a2626; color:#ff9a94; }
+.chip.decl { background:transparent; border-style:dashed; border-color:var(--acc); color:var(--acc); }
 .chip.none { background:transparent; border-style:dashed; color:var(--mut); }

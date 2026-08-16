@@ -176,16 +176,18 @@ function sendResult(reply, res) {
 
 // ---- runs (score a predictions file) --------------------------------------
 // Body: { task, dataset_id, model_config_id, predictions: {doc_id: value},
-//         extraction_type_id?, prompt_id?, checkpoint?, override?, notes? }
+//         extraction_type_id?, prompt_id?, checkpoint?, supported_classes?, override?, notes? }
+// supported_classes: DECLARED file types this run's model handles (array). Omit/null = undeclared.
 app.post('/api/runs', async (req, reply) => {
   const b = req.body || {};
   if (!TASKS.includes(b.task)) return reply.code(400).send({ error: 'bad task' });
   if (!b.predictions || typeof b.predictions !== 'object') return reply.code(400).send({ error: 'predictions object required' });
+  if (b.supported_classes != null && !Array.isArray(b.supported_classes)) return reply.code(400).send({ error: 'supported_classes must be an array' });
   return sendResult(reply, createRun(d, {
     task: b.task, datasetId: Number(b.dataset_id), modelId: b.model_config_id,
     predictions: b.predictions, override: b.override,
     extractionTypeId: b.extraction_type_id, promptId: b.prompt_id,
-    checkpoint: b.checkpoint, notes: b.notes,
+    checkpoint: b.checkpoint, supportedClasses: b.supported_classes, notes: b.notes,
   }));
 });
 
@@ -201,12 +203,36 @@ app.post('/api/runs/manual', async (req, reply) => {
   }));
 });
 
-// Rename a run's display name (run_key / identity stays fixed).
+// Patch a run: rename (display_name) and/or DECLARE its supported file types
+// (supported_classes: array | null). Declaring re-derives the taxonomy-coverage view (no re-score).
+// run_key / identity stays fixed.
 app.patch('/api/runs/:id', async (req, reply) => {
-  const { display_name } = req.body || {};
-  if (!display_name) return reply.code(400).send({ error: 'display_name required' });
-  const info = d.prepare('UPDATE runs SET display_name = ? WHERE id = ?').run(display_name, Number(req.params.id));
-  if (!info.changes) return reply.code(404).send({ error: 'not found' });
+  const id = Number(req.params.id);
+  const b = req.body || {};
+  const run = d.prepare('SELECT id, task, extraction_type_id FROM runs WHERE id = ?').get(id);
+  if (!run) return reply.code(404).send({ error: 'not found' });
+  if (b.display_name) d.prepare('UPDATE runs SET display_name = ? WHERE id = ?').run(b.display_name, id);
+
+  if ('supported_classes' in b) {
+    if (b.supported_classes != null && !Array.isArray(b.supported_classes)) return reply.code(400).send({ error: 'supported_classes must be an array or null' });
+    d.prepare('UPDATE runs SET supported_classes_json = ? WHERE id = ?').run(b.supported_classes ? JSON.stringify(b.supported_classes) : null, id);
+    // re-derive coverage from the stored atomic layer (segmentation/classification only)
+    if (run.task === 'segmentation' || run.task === 'classification') {
+      const supportedClasses = b.supported_classes || null;
+      let atomic, opts;
+      if (run.task === 'segmentation') {
+        atomic = d.prepare('SELECT * FROM analysis_events WHERE run_id = ?').all(id);
+        opts = { classBuckets: loadClassBuckets(d), taxonomy: loadTaxonomy(d), supportedClasses };
+      } else {
+        atomic = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ?').all(id);
+        opts = { taxonomy: loadTaxonomy(d), supportedClasses };
+      }
+      if (atomic.length) {
+        const analysis = aggregateTask(run.task, atomic, opts);
+        if (analysis) d.prepare('UPDATE runs SET analysis_json = ? WHERE id = ?').run(JSON.stringify(analysis), id);
+      }
+    }
+  }
   return { ok: true };
 });
 
@@ -244,6 +270,8 @@ app.get('/api/runs/:id', async (req, reply) => {
   if (!run) return reply.code(404).send({ error: 'not found' });
   if (run.analysis_json) run.analysis = JSON.parse(run.analysis_json);
   delete run.analysis_json;
+  run.supported_classes = run.supported_classes_json ? JSON.parse(run.supported_classes_json) : null;
+  delete run.supported_classes_json;
   run.metrics = d.prepare('SELECT key, value, scope FROM run_metrics WHERE run_id = ?').all(id);
   run.items = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ? LIMIT 2000').all(id);
   return run;
@@ -263,16 +291,17 @@ app.get('/api/runs/:id/events', async (req) => {
 // segmentation re-aggregates from analysis_events; classification/extraction from item_results.
 app.post('/api/runs/:id/reaggregate', async (req, reply) => {
   const id = Number(req.params.id);
-  const run = d.prepare('SELECT id, task, extraction_type_id FROM runs WHERE id = ?').get(id);
+  const run = d.prepare('SELECT id, task, extraction_type_id, supported_classes_json FROM runs WHERE id = ?').get(id);
   if (!run) return reply.code(404).send({ error: 'not found' });
+  const supportedClasses = run.supported_classes_json ? JSON.parse(run.supported_classes_json) : null;
 
   let atomic, opts = {};
   if (run.task === 'segmentation') {
     atomic = d.prepare('SELECT * FROM analysis_events WHERE run_id = ?').all(id);
-    opts = { classBuckets: loadClassBuckets(d), taxonomy: loadTaxonomy(d) };
+    opts = { classBuckets: loadClassBuckets(d), taxonomy: loadTaxonomy(d), supportedClasses };
   } else {
     atomic = d.prepare('SELECT doc_id, predicted_json, gold_json, correct, detail_json FROM item_results WHERE run_id = ?').all(id);
-    if (run.task === 'classification') opts = { taxonomy: loadTaxonomy(d) };
+    if (run.task === 'classification') opts = { taxonomy: loadTaxonomy(d), supportedClasses };
     else if (run.task === 'extraction') opts = { fieldSchema: loadFieldSchema(d, run.extraction_type_id) };
   }
   if (!atomic.length) return reply.code(400).send({ error: 'no_events', message: 'this run has no stored atomic rows to re-aggregate' });

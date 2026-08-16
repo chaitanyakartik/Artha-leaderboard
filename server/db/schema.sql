@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS runs (
   gt_fingerprint        TEXT,                -- GT hash at scoring time (auto-ingest "GT matches" check)
   analysis_json         TEXT,                -- rich per-run analysis (e.g. segmentation "popular misses"); drives the run drill-down
   prompt_id             INTEGER REFERENCES prompts(id),        -- the prompt this run used
+  supported_classes_json TEXT,               -- DECLARED (not inferred) file types this run's model supports; frozen at ingest. NULL = undeclared (e.g. zero-shot)
   checkpoint            TEXT,                -- which training artifact of the model_config (e.g. "ckpt-1200"); per-run, not in the id
   notes                 TEXT,
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
