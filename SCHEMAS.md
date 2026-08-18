@@ -140,3 +140,88 @@ A run references one prompt (`prompt_id`); the leaderboard row shows its name + 
 ```
 Add a model here, run `npm run db:init`, and it appears in the registry. The card is served at
 `GET /api/models` so the UI can show what each row's model actually is.
+
+---
+
+## 5. Analyzers (judge-scored, ingest-only)
+
+Analyzers are a separate family from the 4 doc-AI tasks. An **analyzer** (bank_statement, cibil,
+financial, five_c_credit, gst, income, application, overview, rental, policy_deviation) consumes a
+document capture and emits **structured JSON or narrative text**. There is **no exact-match gold** —
+quality comes from an **LLM-as-judge** (e.g. Gemini 3.1 Pro) that scores blinded A/B outputs.
+
+### Corrected data model
+
+- **Dataset = the captures** (the `.txt` files), normalized into `analyzer_captures`. Each capture
+  holds the input sent to the analyzer + the **real Gemini production output** as the reference.
+  This is the GT.
+- **Run = one model (gemma) over the dataset**, stored in `analyzer_runs`. Per-doc judged results
+  land in `analyzer_run_items`. The board ranks runs; each item records both the gemma-side and the
+  reference (gemini) judge scores so the diff is self-contained.
+
+### Capture bundle shape (POST /api/analyzer-captures)
+
+```jsonc
+// Body: { "dataset_id": 6, "captures": [ <capture>, … ] }
+{
+  "analyzer": "bank_statement",                  // required — a roster slug
+  "doc_id": "bank_statement_185836_006_ce2c88",  // required — filename stem, unique per dataset+analyzer
+  "application": "PL49263967",                   // optional
+  "product_type": "PL",                          // optional; null if the file says '-' or '—'
+  "input": { /* parsed INPUT JSON */ },          // OR "input": "raw text" if not JSON
+  "reference_output": { /* Gemini prod output */ } // OR "reference_output": "narrative text"
+}
+```
+
+### Run ingest shape (POST /api/analyzer-runs)
+
+```jsonc
+{
+  "dataset_id": 6,
+  "model": "gemma-4-31b",                        // model_config id for the run (created if missing)
+  "ref_model": "gemini-3-1-pro",                 // the reference the judge compared against
+  "display_name": "gemma-4-31b · v4",            // optional; defaults to "model · datasetName"
+  "judge_model": "gemini-3.1-pro-preview",       // optional
+  "items": [                                      // one per (analyzer, doc_id)
+    {
+      "analyzer": "bank_statement",
+      "doc_id": "bank_statement_185836_006_ce2c88",
+      "output": { /* gemma output */ },           // OR string
+      "judge": {                                   // gemma-side scores (0–100)
+        "overall_goodness": 52, "faithfulness": 60, "completeness": 45,
+        "score_rationale": { … }, "hallucinations": [ … ],
+        "omissions": [ … ], "factual_errors": [ … ]
+      },
+      "reference_judge": {                         // gemini-side scores from judge file
+        "overall_goodness": 79, "faithfulness": 82, "completeness": 77, …
+      },
+      "winner": "model" | "reference" | "tie",
+      "comparison_summary": "…",
+      "agreements": "…"
+    }
+  ]
+}
+```
+
+### Importers
+
+```bash
+# 1. Import GT captures from a v4 .txt pile (idempotent).
+node scripts/import-analyzer-gt.js <v4dir> [datasetName=v4]
+
+# 2. Import a gemma run (results + judge) — accumulates all docs into one run (idempotent).
+node scripts/import-analyzer-run.js <resultsDir> <judgementsDir> \
+  [datasetName=v4] [modelId=gemma-4-31b] [refModelId=gemini-3-1-pro] [runName]
+```
+
+**`import-analyzer-gt.js`**: parses each `<v4dir>/*.txt` (skips `_excluded` prefix). Reads the
+`ANALYZER`/`APPLICATION`/`PRODUCT` header; JSON-parses the `INPUT` and `OUTPUT` sections (raw
+string fallback). Creates the dataset (`scope=analyzers`) if missing. Upserts into
+`analyzer_captures`.
+
+**`import-analyzer-run.js`**: walks `<resultsDir>/*_v4_*.json`; splits on `_v4_` to extract
+`doc_id`; looks up the `analyzer_slug` from `analyzer_captures` (so the short file codes `ss`,
+`bs`, `5c` resolve to roster slugs automatically). Loads the matching
+`<judgementsDir>/<stem>.judge.json`; maps `faithfulness_score→faithfulness`,
+`completeness_score→completeness`; maps `winner=gemma→model / gemini→reference / else→tie`. Calls
+`ingestAnalyzerRun` once for the whole batch.

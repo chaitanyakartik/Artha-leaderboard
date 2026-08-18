@@ -8,6 +8,12 @@ import { db, ROOT } from '../db.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const d = db();
+
+// One-time migration: drop the old analyzer_runs table (wrong shape — modeled captures as runs).
+// The new schema creates analyzer_captures, analyzer_runs (new shape), analyzer_run_items.
+// This fires before the schema.sql CREATE IF NOT EXISTS, so the new shape is created fresh.
+d.exec('DROP TABLE IF EXISTS analyzer_runs');
+
 d.exec(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
 d.exec(fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8'));
 

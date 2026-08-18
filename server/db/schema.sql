@@ -32,6 +32,16 @@ CREATE TABLE IF NOT EXISTS model_configs (
   card_json TEXT                             -- full model card (kind, components, base, tasks, ...)
 );
 
+-- Human notes per (model config × task): a config's notes can differ per task
+-- ("great at classification, weak at segmentation boundaries"). Replaces the single models.md blob.
+CREATE TABLE IF NOT EXISTS config_task_notes (
+  model_config_id TEXT NOT NULL REFERENCES model_configs(id) ON DELETE CASCADE,
+  task            TEXT NOT NULL REFERENCES tasks(slug),
+  text            TEXT,
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (model_config_id, task)
+);
+
 -- The 140-class taxonomy for classification.
 CREATE TABLE IF NOT EXISTS class_taxonomy (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,3 +158,76 @@ CREATE INDEX IF NOT EXISTS idx_events_run ON analysis_events(run_id);
 CREATE INDEX IF NOT EXISTS idx_gt_dataset_task ON gt_items(dataset_id, task);
 CREATE INDEX IF NOT EXISTS idx_runs_task_dataset ON runs(task, dataset_id);
 CREATE INDEX IF NOT EXISTS idx_item_results_run ON item_results(run_id);
+
+-- ---- Analyzers (judge-scored, ingest-only) ------------------------------------
+
+CREATE TABLE IF NOT EXISTS analyzers (
+  slug            TEXT PRIMARY KEY,
+  label           TEXT NOT NULL,
+  prod_model      TEXT,
+  thinking        TEXT,
+  output_type     TEXT,                       -- 'json' | 'text'
+  schema_enforced INTEGER NOT NULL DEFAULT 0,
+  prompt_source   TEXT,                        -- 'local' | 'langfuse'
+  notes           TEXT,
+  sort_order      INTEGER NOT NULL DEFAULT 0
+);
+
+-- THE DATASET (neat GT, normalized from the .txt captures)
+CREATE TABLE IF NOT EXISTS analyzer_captures (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  dataset_id           INTEGER NOT NULL,
+  analyzer_slug        TEXT NOT NULL,
+  doc_id               TEXT NOT NULL,
+  application          TEXT,
+  product_type         TEXT,
+  input_json           TEXT,               -- parsed INPUT ({"json":...} or {"text":...})
+  reference_output_json TEXT,              -- parsed OUTPUT = the real Gemini prod output
+  source_ref           TEXT,
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(dataset_id, analyzer_slug, doc_id)
+);
+
+-- A RUN = one model (gemma) submission over a dataset
+CREATE TABLE IF NOT EXISTS analyzer_runs (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  dataset_id           INTEGER NOT NULL,
+  model_config_id      TEXT NOT NULL,      -- e.g. gemma-4-31b
+  ref_model_config_id  TEXT,               -- the reference the judge compared against (gemini-*)
+  display_name         TEXT,
+  judge_model          TEXT,
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  notes                TEXT,
+  UNIQUE(dataset_id, model_config_id, display_name)
+);
+
+-- Per-doc judged result within a run
+CREATE TABLE IF NOT EXISTS analyzer_run_items (
+  id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id                   INTEGER NOT NULL,
+  analyzer_slug            TEXT NOT NULL,
+  doc_id                   TEXT NOT NULL,
+  output_json              TEXT,                   -- gemma output ({"json":...}|{"text":...})
+  overall_goodness         REAL,
+  faithfulness             REAL,
+  completeness             REAL,
+  score_rationale_json     TEXT,
+  hallucinations_json      TEXT,
+  omissions_json           TEXT,
+  factual_errors_json      TEXT,
+  winner                   TEXT,                   -- 'model' | 'reference' | 'tie'
+  comparison_summary       TEXT,
+  agreements               TEXT,
+  -- reference (gemini) side captured from the judge, for the diff baseline:
+  ref_goodness             REAL,
+  ref_faithfulness         REAL,
+  ref_completeness         REAL,
+  ref_score_rationale_json TEXT,
+  ref_hallucinations_json  TEXT,
+  ref_omissions_json       TEXT,
+  ref_factual_errors_json  TEXT,
+  UNIQUE(run_id, analyzer_slug, doc_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_analyzer_captures_dataset ON analyzer_captures(dataset_id, analyzer_slug);
+CREATE INDEX IF NOT EXISTS idx_analyzer_run_items_run ON analyzer_run_items(run_id, analyzer_slug);
