@@ -1,9 +1,10 @@
 [
-  { "code": "aadhaar",        "label": "Aadhaar",          "bucket": "KYC" },
-  { "code": "pan",            "label": "PAN",              "bucket": "KYC" },
-  { "code": "bank_statement", "label": "Bank Statement",   "bucket": "financial" },
-  { "code": "salary_slip",    "label": "Salary Slip",      "bucket": "financial" },
-  { "code": "itr",            "label": "ITR",              "bucket": "ITR" },
-  { "code": "rent_agreement", "label": "Rent Agreement",   "bucket": "rental" },
-  { "code": "sale_deed",      "label": "Sale Deed",        "bucket": "property" }
+  { "code": "aadhar_card",      "label": "aadhar_card",      "bucket": "identity_doc" },
+  { "code": "pan_card",         "label": "pan_card",         "bucket": "identity_doc" },
+  { "code": "driving_license",  "label": "driving_license",  "bucket": "identity_doc" },
+  { "code": "itr_individual",   "label": "itr_individual",   "bucket": "income_tax" },
+  { "code": "form_16",          "label": "form_16",          "bucket": "income_tax" },
+  { "code": "gst_certificate",  "label": "gst_certificate",  "bucket": "gst_doc" },
+  { "code": "balance_sheet",    "label": "balance_sheet",    "bucket": "financial_statement" },
+  { "code": "bank_statement",   "label": "bank_statement",   "bucket": "bank_credit_doc" }
 ]

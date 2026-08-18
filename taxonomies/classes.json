@@ -275,19 +275,339 @@
     "bucket": "bank_credit_doc"
   },
   {
+    "code": "loan_sanction_letter",
+    "label": "loan_sanction_letter",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "key_facts_statement",
+    "label": "key_facts_statement",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "disbursement_memo",
+    "label": "disbursement_memo",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "disbursement_request_letter",
+    "label": "disbursement_request_letter",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "loan_end_use_letter",
+    "label": "loan_end_use_letter",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "loan_lod_letter",
+    "label": "loan_lod_letter",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "emi_repayment_schedule",
+    "label": "emi_repayment_schedule",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "foreclosure_letter",
+    "label": "foreclosure_letter",
+    "bucket": "loan_doc"
+  },
+  {
+    "code": "noc_financial_institution_docs",
+    "label": "noc_financial_institution_docs",
+    "bucket": "loan_doc"
+  },
+  {
     "code": "other_loan_doc",
     "label": "other_loan_doc",
     "bucket": "loan_doc"
   },
   {
-    "code": "other_property_doc",
-    "label": "other_property_doc",
+    "code": "property_ownership_docs",
+    "label": "property_ownership_docs",
     "bucket": "property_doc"
   },
   {
-    "code": "other_business_reg_doc",
-    "label": "other_business_reg_doc",
+    "code": "property_revenue_docs",
+    "label": "property_revenue_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "property_builder_docs",
+    "label": "property_builder_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "builder_allotment_letter",
+    "label": "builder_allotment_letter",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "property_development_authority_docs",
+    "label": "property_development_authority_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "property_technical_report",
+    "label": "property_technical_report",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "property_tax_receipts",
+    "label": "property_tax_receipts",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "property_tax_receipts_docs",
+    "label": "property_tax_receipts_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "sale_deed_docs",
+    "label": "sale_deed_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "sale_agreement_docs",
+    "label": "sale_agreement_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "agreement_to_sale_cancellation",
+    "label": "agreement_to_sale_cancellation",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "title_search_report",
+    "label": "title_search_report",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "encumbrance_certificate",
+    "label": "encumbrance_certificate",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "cersai_asset_search_report",
+    "label": "cersai_asset_search_report",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "sanctioned_layout_plan",
+    "label": "sanctioned_layout_plan",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "building_use_permission",
+    "label": "building_use_permission",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "municipal_mutation_record",
+    "label": "municipal_mutation_record",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "na_conversion_affidavit",
+    "label": "na_conversion_affidavit",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "non_agriculture_order",
+    "label": "non_agriculture_order",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "village_form_7_12",
+    "label": "village_form_7_12",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "deed_of_hypothecation",
+    "label": "deed_of_hypothecation",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "memorandum_deposit_title_deeds",
+    "label": "memorandum_deposit_title_deeds",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "development_agreement",
+    "label": "development_agreement",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "general_power_of_attorney",
+    "label": "general_power_of_attorney",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "gift_deed_docs",
+    "label": "gift_deed_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "commencement_letter_rajachitthi",
+    "label": "commencement_letter_rajachitthi",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "vetting_report",
+    "label": "vetting_report",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "web_search_report",
+    "label": "web_search_report",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "other_property_docs",
+    "label": "other_property_docs",
+    "bucket": "property_doc"
+  },
+  {
+    "code": "certificate_of_incorporation",
+    "label": "certificate_of_incorporation",
     "bucket": "business_reg_doc"
+  },
+  {
+    "code": "shop_act_license",
+    "label": "shop_act_license",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "trade_license",
+    "label": "trade_license",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "udyam_certificate",
+    "label": "udyam_certificate",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "trust_deed",
+    "label": "trust_deed",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "partnership_deed",
+    "label": "partnership_deed",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "memorandum_of_association",
+    "label": "memorandum_of_association",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "society_registration",
+    "label": "society_registration",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "professional_license",
+    "label": "professional_license",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "ca_certificate",
+    "label": "ca_certificate",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "iec_certificate",
+    "label": "iec_certificate",
+    "bucket": "business_reg_doc"
+  },
+  {
+    "code": "electricity_bill",
+    "label": "electricity_bill",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "gas_bill",
+    "label": "gas_bill",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "phone_bill",
+    "label": "phone_bill",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "water_bill",
+    "label": "water_bill",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "ration_card",
+    "label": "ration_card",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "salary_slip",
+    "label": "salary_slip",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "rent_agreement",
+    "label": "rent_agreement",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "legal_heir_certificate",
+    "label": "legal_heir_certificate",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "death_certificate",
+    "label": "death_certificate",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "experience_letter",
+    "label": "experience_letter",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "dual_demographic_undertaking",
+    "label": "dual_demographic_undertaking",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "application_form",
+    "label": "application_form",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "invoice_quotation_bill",
+    "label": "invoice_quotation_bill",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "payment_receipt",
+    "label": "payment_receipt",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "marriage_certificate",
+    "label": "marriage_certificate",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "birth_certificate",
+    "label": "birth_certificate",
+    "bucket": "utility_kyc_doc"
+  },
+  {
+    "code": "income_certificate",
+    "label": "income_certificate",
+    "bucket": "utility_kyc_doc"
   },
   {
     "code": "other_utility_kyc_doc",
@@ -295,8 +615,58 @@
     "bucket": "utility_kyc_doc"
   },
   {
-    "code": "other_doc",
-    "label": "other_doc",
+    "code": "email",
+    "label": "email",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "field_investigation_report",
+    "label": "field_investigation_report",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "field_visit_photograph",
+    "label": "field_visit_photograph",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "photograph",
+    "label": "photograph",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "vehicle_info",
+    "label": "vehicle_info",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "vehicle_insurance_policy",
+    "label": "vehicle_insurance_policy",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "wholesale_cam",
+    "label": "wholesale_cam",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "fcu_report",
+    "label": "fcu_report",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "other",
+    "label": "other",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "unclassified",
+    "label": "unclassified",
+    "bucket": "other_doc"
+  },
+  {
+    "code": "indic_other",
+    "label": "indic_other",
     "bucket": "other_doc"
   }
 ]
