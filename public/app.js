@@ -56,6 +56,13 @@ function bindMenu() {
     localStorage.setItem('artha_theme', b.dataset.theme); markTheme();
   });
   markTheme();
+
+  // Export the whole DB — CSV (zip of one CSV per table) or a .sqlite snapshot.
+  // A plain navigation to the endpoint lets the browser handle the download.
+  $('#exportBtns').querySelectorAll('.tg').forEach((b) => b.onclick = () => {
+    window.location.href = `/api/export?format=${b.dataset.format}`;
+    menu.hidden = true;
+  });
 }
 
 // Switch among: Overview (standings) · a task leaderboard · Config (reference data).

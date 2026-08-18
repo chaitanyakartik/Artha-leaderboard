@@ -8,6 +8,8 @@ import { createRun, loadClassBuckets, loadFieldSchema, loadTaxonomy } from './ru
 import { aggregateTask } from './scoring/aggregate.js';
 import { ingestWandb } from './ingest/wandb.js';
 import { ingestAnalyzerCaptures, ingestAnalyzerRun } from './analyzers.js';
+import { exportCsvZip, tableToCsv, snapshotSqlite, listTables } from './export.js';
+import fsp from 'fs/promises';
 import { config, authConfigured } from './config.js';
 import { verifyPassword, issueToken, verifyToken, parseCookies, sessionCookie, clearCookie, COOKIE_NAME } from './auth.js';
 
@@ -769,6 +771,43 @@ app.get('/api/analyzer-doc', async (req, reply) => {
 
   return result;
 });
+
+// ---- export ---------------------------------------------------------------
+// Whole-DB dump. ?format=sqlite -> a consistent single-file snapshot;
+// otherwise CSV: ?table=<name> for one table, or a zip of one CSV per table.
+app.get('/api/export', async (req, reply) => {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const format = String(req.query.format || 'csv').toLowerCase();
+
+  if (format === 'sqlite') {
+    const tmp = snapshotSqlite(d);
+    try {
+      const buf = await fsp.readFile(tmp);
+      return reply
+        .header('content-type', 'application/x-sqlite3')
+        .header('content-disposition', `attachment; filename="artha-${stamp}.sqlite"`)
+        .send(buf);
+    } finally {
+      fsp.unlink(tmp).catch(() => {});
+    }
+  }
+
+  const table = req.query.table && String(req.query.table);
+  if (table) {
+    if (!listTables(d).includes(table)) return reply.code(404).send({ error: 'unknown_table' });
+    return reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="artha-${table}-${stamp}.csv"`)
+      .send(tableToCsv(d, table));
+  }
+
+  return reply
+    .header('content-type', 'application/zip')
+    .header('content-disposition', `attachment; filename="artha-export-${stamp}.zip"`)
+    .send(exportCsvZip(d));
+});
+
+app.get('/api/export/tables', async () => ({ tables: listTables(d) }));
 
 // ---- static frontend ------------------------------------------------------
 app.register(fastifyStatic, { root: path.join(ROOT, 'public') });
