@@ -898,6 +898,8 @@ td.az2-ref { color: var(--dim); }
 
 /* analyzers standings on the Overview page (the "Analysers" option) */
 .pillsep { width: 1px; align-self: stretch; background: var(--hairline-2); margin: 2px 4px; }
+.azov-dsbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.azov-dsbar .dsbar { display: flex; flex-wrap: wrap; gap: 6px; }
 .azov-cap { font: 400 12px/1.4 var(--sans); color: var(--mut); margin-bottom: 10px; }
 .azov-cap .az2-you { color: var(--signal); } .azov-cap .az2-refn { color: var(--fg); }
 .azov-m { text-align: right; }

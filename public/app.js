@@ -142,14 +142,25 @@ async function loadOverviewAnalyzers() {
   const dsList = state.datasets.filter((d) => (d.scope || '') === 'analyzers');
   if (!dsList.length) { host.innerHTML = `<p class="muted">No analyzer datasets yet. Open the <b>Analysers</b> tab to create one and ingest a run.</p>`; return; }
   const ds = dsList.find((d) => d.id === state.analyzerDatasetId) || dsList[0];
-  host.innerHTML = '<p class="muted">loading…</p>';
+  state.analyzerDatasetId = ds.id;
+  // Dataset selector — same skin as the Analysers tab; lets you switch when more datasets arrive.
+  const dsPills = dsList.map((x) => `<button class="dspill${x.id === ds.id ? ' on' : ''}" data-ds="${x.id}"><span class="dspill-name">${esc(x.name)}</span>${x.n_docs ? `<span class="dspill-n">${x.n_docs}d</span>` : ''}</button>`).join('');
+  const dsBar = `<div class="azov-dsbar"><span class="dsbar-label">Dataset</span><div class="dsbar">${dsPills}</div></div>`;
+  const bindDs = () => host.querySelectorAll('.azov-dsbar .dspill[data-ds]').forEach((b) => b.onclick = () => {
+    const id = Number(b.dataset.ds);
+    if (id === state.analyzerDatasetId) return;
+    state.analyzerDatasetId = id; state.analyzerSlug = null; state._azTree = null;
+    loadOverviewAnalyzers();
+  });
+  host.innerHTML = dsBar + '<p class="muted">loading…</p>';
+  bindDs();
   try {
     const tree = await api(`/api/analyzer-tree?dataset_id=${ds.id}`);
     const rows = tree.map((az) => ({ az, ...azRunSummary(az) })).filter((r) => r.hasRuns)
       .sort((a, b) => (a.gap ?? 1e9) - (b.gap ?? 1e9));
     const refName = (tree.find((a) => a.headline && a.headline.ref_model_name) || {}).headline?.ref_model_name;
     const runName = (rows[0] || {}).gm?.model_name;
-    if (!rows.length) { host.innerHTML = `<p class="muted">No judged runs yet in <b>${esc(ds.name)}</b>. Ingest one in the <b>Analysers</b> tab.</p>`; return; }
+    if (!rows.length) { host.innerHTML = dsBar + `<p class="muted">No judged runs yet in <b>${esc(ds.name)}</b>. Ingest one in the <b>Analysers</b> tab.</p>`; bindDs(); return; }
     const mcell = (ours, gem) => {
       const d = azGap(ours, gem);
       const ahead = d == null ? '' : d >= 0 ? 'good' : 'bad';
@@ -160,11 +171,12 @@ async function loadOverviewAnalyzers() {
         ${mcell(r.g, r.refG)}${mcell(r.f, r.refF)}${mcell(r.c, r.refC)}
         <td class="num">${azWlt(r.h)}</td>
         <td class="az2-go">open →</td></tr>`;
-    host.innerHTML = `
+    host.innerHTML = dsBar + `
       <div class="azov-cap"><b class="az2-you">${esc(runName || 'our model')}</b> vs reference <b class="az2-refn">${esc(refName || 'Gemini')}</b> <span class="muted">· ${esc(ds.name)} · sorted by goodness gap · each cell reads ours / gem, Δ below</span></div>
       <div class="az2-panel"><table class="az2-table">
         <thead><tr><th class="az2-h-name">analyzer</th><th class="num">good</th><th class="num">faith</th><th class="num">compl</th><th class="num">W·L·T</th><th></th></tr></thead>
         <tbody>${rows.map(row).join('')}</tbody></table></div>`;
+    bindDs();
     host.querySelectorAll('.az2-row').forEach((tr) => tr.onclick = () => {
       state.analyzerDatasetId = Number(tr.dataset.ds); state.analyzerSlug = tr.dataset.slug; state._azTree = null;
       setView('analyzers');
