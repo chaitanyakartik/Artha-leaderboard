@@ -1,0 +1,22 @@
+# Artha leaderboard — single-service deploy.
+#   docker compose up -d --build
+# Credential + secret come from .env (see .env.example; set with scripts/set-password.js).
+# The SQLite DB + uploads persist in the named volume `artha-data` across restarts/rebuilds.
+services:
+  artha:
+    build: .
+    image: artha-leaderboard
+    container_name: artha-leaderboard
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5173}:5173"
+    env_file:
+      - .env
+    environment:
+      # container always listens on 5173; change only the host side via PORT in your shell/.env
+      PORT: 5173
+    volumes:
+      - artha-data:/app/data
+
+volumes:
+  artha-data:

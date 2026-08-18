@@ -1,0 +1,24 @@
+# Rebuilt inside the image (native better-sqlite3 must compile for linux)
+node_modules
+
+# Runtime state — lives in a mounted volume, never baked into the image
+data
+*.sqlite
+*.sqlite-*
+*.db
+
+# Secrets — injected at runtime via env_file / -e, never copied in
+.env
+
+# VCS / local cruft
+.git
+.gitignore
+.DS_Store
+npm-debug.log*
+
+# Docker + heavy docs not needed at runtime
+Dockerfile
+docker-compose.yml
+.dockerignore
+docs/design-explorations
+scratchpad
