@@ -4,12 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Artha Leaderboard — Sign in</title>
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('artha_theme')||'dark';}catch(e){}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Libre+Franklin:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div class="login-wrap">
     <form id="loginForm" class="login-card">
-      <h1>Artha Leaderboard</h1>
+      <h1>Artha <span>Leaderboard</span></h1>
       <div class="sub">Sign in to continue</div>
       <label>Username<input id="u" name="username" autocomplete="username" autofocus /></label>
       <label>Password<input id="p" name="password" type="password" autocomplete="current-password" /></label>

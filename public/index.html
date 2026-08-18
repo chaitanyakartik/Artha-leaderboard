@@ -4,13 +4,35 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Artha Leaderboard</title>
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('artha_theme')||'dark';}catch(e){}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Libre+Franklin:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <!--
+    DIRECTION CONTRACT — Artha Leaderboard redesign · seed 07154ecd (direction roll, index 5)
+    THESIS: A model-eval leaderboard read like a calibration bench, not a GitHub-dark dashboard.
+      Ground truth is the reference standard; a run is a measurement; support is sample size. Refuses
+      the generic dark-panel-with-blue-accent default and the neon-terminal cliché alike.
+    OWN-WORLD: Cool graphite ground (#14171c) under a faint engineering grid; instrument panels with
+      hairline rules and corner tick marks; ONE calibrated teal signal (#3fb6b0) for the active/winning
+      measurement; muted sea-green/amber/rust status colors. JetBrains Mono for every readout, Libre
+      Franklin small-caps for panel labels. No neon, no rounded candy, no gradients-as-decoration.
+    STORY: Operator picks task + dataset, uploads predictions, reads the headline measurement, and
+      descends config → runs → per-class/confusion/coverage evidence — fast, calm, unambiguous.
+    FIRST VIEWPORT: Instrument masthead + tab bench; a control bar (dataset · GT · +Add run); the board
+      as a paneled measurement table, the leader tick-marked in teal at the top. Primary action = +Add run.
+    FORM: Precision instrument / calibration report. #5 of my grounded list. Seed key 07154ecd.
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+  -->
   <header>
-    <button id="menuBtn" class="menu-btn" title="Settings" aria-label="Settings">☰</button>
-    <h1>Artha Leaderboard</h1>
-    <div class="sub">predictions in &rarr; scored against ground truth &rarr; on the board</div>
+    <div class="brand">
+      <h1>Artha <span>Leaderboard</span></h1>
+      <div class="sub">predictions in &rarr; scored against ground truth &rarr; on the board</div>
+    </div>
+    <button id="menuBtn" class="menu-btn" title="Settings" aria-label="Settings">⚙</button>
     <div id="menu" class="menu" hidden>
       <div class="menu-title">Settings</div>
       <div class="menu-row">
@@ -19,39 +41,43 @@
           <button class="tg" data-mode="best">Best run</button><button class="tg" data-mode="latest">Latest run</button>
         </span>
       </div>
+      <div class="menu-row">
+        <span>Theme</span>
+        <span class="seg-toggle" id="themeToggle">
+          <button class="tg" data-theme="dark">Dark</button><button class="tg" data-theme="light">Light</button>
+        </span>
+      </div>
     </div>
   </header>
 
   <nav id="tabs"></nav>
 
-  <section class="bar">
-    <label>Dataset
-      <select id="dataset"></select>
-    </label>
+  <section class="bar" style="display:none">
+    <span class="dsbar-label">Dataset</span>
+    <div id="datasetBar" class="dsbar"></div>
     <span id="gtStatus" class="gt"></span>
     <div class="spacer"></div>
     <button id="newDataset">+ Dataset</button>
     <button id="uploadGt">Upload GT</button>
     <button id="addRun" class="primary">+ Add run</button>
     <button id="manualRun">Manual entry</button>
+    <button id="compareBtn" disabled>Compare</button>
   </section>
 
   <div id="msg"></div>
 
-  <section id="home" hidden>
-    <div class="home-head">
-      <h2>models.md</h2>
-      <span id="docStatus" class="gt"></span>
-      <div class="spacer"></div>
-      <button id="docSave" class="primary">Save</button>
+  <section id="overview" hidden></section>
+  <section id="analyzers" hidden></section>
+  <section id="config" hidden></section>
+
+  <main style="display:none"><table id="board"><thead></thead><tbody></tbody></table></main>
+
+  <div id="compareModal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><span class="modal-title">Compare configs</span><button id="compareClose" class="modal-close" aria-label="Close">✕</button></div>
+      <div id="compareBody" class="modal-body"></div>
     </div>
-    <textarea id="docEditor" class="doc-editor" spellcheck="false" placeholder="Loading…"></textarea>
-    <div class="hint">Edits save to <code>models.md</code> in the repo. ⌘/Ctrl+S also saves.</div>
-  </section>
-
-  <section id="taxonomy" hidden></section>
-
-  <main><table id="board"><thead></thead><tbody></tbody></table></main>
+  </div>
 
   <input type="file" id="filePicker" accept="application/json" hidden />
   <script src="/app.js"></script>
