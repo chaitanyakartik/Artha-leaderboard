@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { UPLOAD_DIR } from './db.js';
 import { scoreTask, checkCoverage } from './scoring/index.js';
+import { validatePredictions } from './scoring/validate.js';
 import { normalizeLabel } from './scoring/util.js';
 import { semanticName, makeRunKey } from './naming.js';
 
@@ -123,6 +124,9 @@ export function createRun(d, params) {
   }
 
   // ---- scored: predictions vs stored GT ----
+  const shapeErr = validatePredictions(task, predictions);
+  if (shapeErr) return { ok: false, code: 'bad_payload', message: shapeErr.message, expected: shapeErr.expected };
+
   const gt = loadGt(d, datasetId, task);
   const gtIds = Object.keys(gt);
   if (gtIds.length === 0) return { ok: false, code: 'no_gt', message: 'no ground truth uploaded for this dataset+task' };
