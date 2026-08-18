@@ -6,7 +6,8 @@ One place to answer *"which model config wins, on which task, on which dataset."
 
 - Origin: Second Brain `raw/2026-08-14-validation-revamp-jiocare-artha-dump.md`; tracked in
   `work/artha/artha-validation.md`. Part of chaitu's "deployment" track of the validation revamp.
-- Companion docs in this repo: **`PLAN.md`** (design + phasing), **`SCHEMAS.md`** (file contracts).
+- Companion docs in this repo: **`README.md`** (front-door: run + Docker deploy + backup),
+  **`PLAN.md`** (design + phasing), **`SCHEMAS.md`** (file contracts).
   This file is the authoritative status + architecture + decisions doc — start here.
 
 ## Working style (token efficiency)
@@ -40,7 +41,8 @@ One place to answer *"which model config wins, on which task, on which dataset."
 | Model registry + model cards | ✅ working |
 | W&B auto-ingest | 🔴 scaffolded, gated OFF, unimplemented |
 | Frontend (4-tab board, upload, manual) | ✅ working, no-build vanilla JS |
-| Deploy on the VM / phone access | ❌ not done — runs on localhost only |
+| Dockerized deploy | ✅ multi-stage image + compose + named volume; **init guarded to fresh-volume only** (see §9). VM/phone rollout pending an actual VM |
+| DB export / backup | ✅ `/api/export` — CSV-per-table zip, single-table CSV, or `.sqlite` snapshot; in the ⚙ menu |
 | Per-doc error drill-down UI | 🟡 segmentation has a row drop-down (analysis + offenders); other tasks show items only |
 | classifier-profile / extraction-type CRUD UI | ❌ not built (tables + scoring hooks exist; seed via SQL) |
 | Separate "runs" tab | ❌ deferred by chaitu ("we'll see later") |
@@ -53,8 +55,9 @@ One place to answer *"which model config wins, on which task, on which dataset."
 - Run identity/dedup, model cards, unified `createRun()` core, W&B scaffold.
 
 ### Pending / next
-- **Deploy on the VM + reach it from the phone over Tailscale** — the remaining half of the
-  original "tonight" target; highest real-world value.
+- **Deploy on the VM + reach it from the phone over Tailscale** — highest real-world value.
+  **Dockerized (image + compose + volume, init-guarded) and verified locally**; the remaining step
+  is running it on an actual VM and exposing it over the tailnet.
 - Confirm the **segmentation schema** (chaitu to supply) and re-check segregation semantics on real data.
 - Per-doc **error drill-down** UI (the audit-vs-source loop); CRUD for classifier profiles / extraction types.
 - Enable **W&B auto-ingest** when the training→eval loop is ready.
@@ -180,6 +183,8 @@ Normalizers live in `server/scoring/util.js`:
 | GET | `/api/runs/:id/events` | raw per-page events (the re-aggregatable layer) |
 | POST | `/api/runs/:id/reaggregate` | re-derive `analysis` from stored events (apply new views/buckets, no re-score) |
 | POST | `/api/ingest/wandb` | W&B auto-ingest — **501 until `ARTHA_WANDB_INGEST=on`** |
+| GET | `/api/export?format=csv\|sqlite&table=` | whole-DB dump: CSV-per-table zip, one-table CSV, or `.sqlite` snapshot |
+| GET | `/api/export/tables` | list exportable table names |
 
 Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomplete`→422,
 `duplicate_external`→409, `gt_mismatch`→409).
@@ -259,7 +264,18 @@ Failure codes map to HTTP via `CODE_STATUS` in `index.js` (e.g. `coverage_incomp
 - **doc_id must be identical** across GT and every predictions file for a dataset — it's the join key
   and what the coverage gate checks. chaitu defines the doc_id scheme.
 - **Starter credential** used in dev/smoke: `chaitu` / `changeme-artha` — change it before deploying.
-- `.env` is gitignored; only `.env.example` is tracked. `data/` (DB + uploads) is fully gitignored.
+- `.env` is gitignored; only `.env.example` is tracked. `data/` (DB + uploads) and `backups/` are gitignored.
+- **Docker init is guarded** — `docker-entrypoint.sh` runs `server/db/init.js` **only when the DB file
+  is absent** (fresh volume). Why: `init.js` does `DROP TABLE IF EXISTS analyzer_runs` every run, so
+  auto-running it on each boot would wipe analyzer data. To migrate an *existing* DB after an upgrade,
+  run it deliberately: `docker compose exec artha node server/db/init.js`.
+- **Deploy path** — `docker compose up -d --build`; DB+uploads live in the `artha-data` named volume.
+  `set-password.js` writes `.env`, which compose passes in via `env_file` (never baked into the image).
+  To carry local data onto the VM: `docker compose cp data/artha.sqlite artha:/app/data/artha.sqlite`
+  then restart. Full runbook in `README.md`.
+- **Back up before risky changes** — `server/export.js` powers `/api/export`; for an offline snapshot,
+  a `.sqlite` copy + the CSV zip together fully restore every number on the board. The store-only ZIP
+  writer is dependency-free (own CRC32), and the `.sqlite` snapshot uses `VACUUM INTO` (WAL-collapsed).
 - **Add a new segmentation analysis view** → add a derivation to `seg_aggregate.js::aggregate()`
   (pure function of events) and render it in `app.js::renderDetail`. Old runs pick it up via
   `POST /api/runs/:id/reaggregate` — no re-scoring, because the events are already stored.
