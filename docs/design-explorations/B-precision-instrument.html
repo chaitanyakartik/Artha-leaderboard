@@ -1,0 +1,1525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artha Leaderboard — Precision Instrument</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Libre+Franklin:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ground:      #14171c;
+    --panel:       #1b1f26;
+    --panel-lift:  #21262f;
+    --hairline:    #2b313b;
+    --hairline-2:  #333b47;
+    --text-primary:#e8eaed;
+    --text-muted:  #8b93a3;
+    --text-dim:    #5a6373;
+    --signal:      #3fb6b0;
+    --signal-dim:  rgba(63,182,176,0.12);
+    --signal-bg:   rgba(63,182,176,0.07);
+    --good:        #3fa66a;
+    --good-dim:    rgba(63,166,106,0.15);
+    --amber:       #d1a24a;
+    --amber-dim:   rgba(209,162,74,0.15);
+    --rust:        #c26b5e;
+    --rust-dim:    rgba(194,107,94,0.15);
+    --mono:        'JetBrains Mono', monospace;
+    --sans:        'Libre Franklin', sans-serif;
+  }
+
+  html, body {
+    background: var(--ground);
+    color: var(--text-primary);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Faint engineering background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(43,49,59,0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(43,49,59,0.35) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body > * { position: relative; z-index: 1; }
+
+  /* ── Masthead ── */
+  .masthead {
+    background: var(--panel);
+    border-bottom: 1px solid var(--hairline);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    position: relative;
+  }
+  .masthead::after {
+    content: '';
+    position: absolute;
+    bottom: -3px; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--signal) 0%, transparent 60%);
+    opacity: 0.4;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .brand-name {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+    text-transform: uppercase;
+  }
+  .brand-name span { color: var(--signal); }
+  .brand-tagline {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    font-weight: 300;
+    font-family: var(--sans);
+    border-left: 1px solid var(--hairline-2);
+    padding-left: 14px;
+  }
+
+  .masthead-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .toggle-group {
+    display: flex;
+    background: var(--ground);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .toggle-btn {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-right: 1px solid var(--hairline);
+  }
+  .toggle-btn:last-child { border-right: none; }
+  .toggle-btn.active {
+    background: var(--signal-dim);
+    color: var(--signal);
+  }
+  .gear-btn {
+    width: 30px; height: 30px;
+    background: transparent;
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .gear-btn:hover { border-color: var(--hairline-2); color: var(--text-primary); }
+
+  /* ── Tab nav ── */
+  .tab-nav {
+    background: var(--panel);
+    border-bottom: 1px solid var(--hairline);
+    padding: 0 28px;
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+  }
+  .tab {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 11px 16px 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s;
+  }
+  .tab:hover { color: var(--text-muted); }
+  .tab.active {
+    color: var(--signal);
+    border-bottom-color: var(--signal);
+    background: var(--signal-bg);
+  }
+
+  /* ── Main content ── */
+  .main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 20px 28px 60px;
+  }
+
+  /* ── Control bar ── */
+  .control-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .control-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+  .control-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .select-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .select-wrap::after {
+    content: '▾';
+    position: absolute;
+    right: 9px;
+    font-size: 9px;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+  select {
+    appearance: none;
+    background: var(--panel);
+    border: 1px solid var(--hairline-2);
+    color: var(--text-primary);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 26px 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+  }
+  select:focus { border-color: var(--signal); }
+
+  .gt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--good-dim);
+    border: 1px solid rgba(63,166,106,0.3);
+    border-radius: 2px;
+    padding: 5px 9px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--good);
+    letter-spacing: 0.04em;
+  }
+  .gt-chip::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--good);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--hairline-2);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--hairline-2); color: var(--text-primary); background: var(--panel-lift); }
+  .btn-primary {
+    background: var(--signal);
+    border-color: var(--signal);
+    color: var(--ground);
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: #45c4be; border-color: #45c4be; color: var(--ground); }
+
+  /* ── Section label ── */
+  .section-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::before {
+    content: '';
+    display: inline-block;
+    width: 3px; height: 3px;
+    background: var(--signal);
+    border-radius: 50%;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--hairline);
+  }
+
+  /* ── Board panel ── */
+  .board-panel {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  /* Corner tick marks */
+  .board-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 8px; height: 8px;
+    border-top: 1px solid var(--signal);
+    border-left: 1px solid var(--signal);
+    opacity: 0.5;
+    z-index: 2;
+  }
+  .board-panel::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 8px; height: 8px;
+    border-bottom: 1px solid var(--signal);
+    border-right: 1px solid var(--signal);
+    opacity: 0.5;
+    z-index: 2;
+  }
+
+  /* ── Table ── */
+  .board-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .board-table thead tr {
+    background: var(--ground);
+    border-bottom: 1px solid var(--hairline-2);
+  }
+  .board-table th {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 9px 14px;
+    text-align: left;
+    white-space: nowrap;
+    border-right: 1px solid var(--hairline);
+  }
+  .board-table th:last-child { border-right: none; }
+  .board-table th.num { text-align: right; }
+
+  .board-table tbody tr {
+    border-bottom: 1px solid var(--hairline);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .board-table tbody tr:last-child { border-bottom: none; }
+  .board-table tbody tr:hover > td { background: var(--panel-lift); }
+  .board-table tbody tr.winner > td { background: var(--signal-bg); }
+  .board-table tbody tr.winner:hover > td { background: rgba(63,182,176,0.11); }
+
+  .board-table td {
+    padding: 10px 14px;
+    border-right: 1px solid var(--hairline);
+    vertical-align: middle;
+  }
+  .board-table td:last-child { border-right: none; }
+
+  /* Gutter rank column */
+  .col-rank {
+    width: 36px;
+    text-align: center;
+    padding: 10px 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    position: relative;
+  }
+  .winner .col-rank {
+    color: var(--signal);
+  }
+  .winner .col-rank::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 2px; height: 18px;
+    background: var(--signal);
+    border-radius: 0 1px 1px 0;
+  }
+
+  .col-model {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .col-model .expand-icon {
+    display: inline-block;
+    width: 16px; height: 16px;
+    line-height: 16px;
+    text-align: center;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-right: 6px;
+    vertical-align: middle;
+    border: 1px solid var(--hairline-2);
+    border-radius: 2px;
+    transition: transform 0.15s;
+  }
+  .expanded .col-model .expand-icon {
+    transform: rotate(90deg);
+    color: var(--signal);
+    border-color: var(--signal);
+  }
+  .winner .col-model { color: var(--signal); }
+
+  .col-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 400;
+    text-align: right;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .col-num.headline { font-weight: 600; color: var(--text-primary); }
+  .winner .col-num.headline { color: var(--signal); }
+  .col-num.muted { color: var(--text-muted); }
+
+  .col-ckpt {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .col-runs {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-align: right;
+    color: var(--text-muted);
+  }
+  .col-when {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  /* ── Model expand section ── */
+  .model-expand {
+    background: var(--ground);
+    border-top: 1px solid var(--hairline);
+  }
+  .model-expand-inner {
+    padding: 0;
+  }
+  .run-list-header {
+    display: grid;
+    grid-template-columns: 160px 1fr 1fr 1fr 1fr;
+    gap: 0;
+    padding: 7px 56px 7px 56px;
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .run-list-header span {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .run-list-header span:not(:first-child) { text-align: right; }
+
+  .run-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 1fr 1fr 1fr;
+    gap: 0;
+    padding: 8px 56px;
+    border-bottom: 1px solid var(--hairline);
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .run-row:last-of-type { border-bottom: none; }
+  .run-row:hover { background: var(--panel-lift); }
+  .run-row.run-expanded { background: var(--signal-bg); border-left: 2px solid var(--signal); padding-left: 54px; }
+
+  .run-ckpt {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .run-expand-icon {
+    display: inline-block;
+    width: 14px; height: 14px;
+    line-height: 14px;
+    text-align: center;
+    font-size: 8px;
+    color: var(--text-dim);
+    border: 1px solid var(--hairline-2);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .run-expanded .run-expand-icon {
+    color: var(--signal);
+    border-color: var(--signal);
+    transform: rotate(90deg);
+    display: inline-block;
+  }
+  .run-acc {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align: right;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .run-when {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-align: right;
+    color: var(--text-dim);
+  }
+
+  /* Coverage chips */
+  .cov-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 2px;
+    padding: 3px 7px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    justify-content: flex-end;
+  }
+  .cov-chip.full {
+    background: var(--good-dim);
+    border: 1px solid rgba(63,166,106,0.35);
+    color: var(--good);
+  }
+  .cov-chip.partial {
+    background: var(--amber-dim);
+    border: 1px solid rgba(209,162,74,0.35);
+    color: var(--amber);
+  }
+  .cov-chip.manual {
+    background: rgba(139,147,163,0.1);
+    border: 1px solid rgba(139,147,163,0.25);
+    color: var(--text-muted);
+  }
+  .cov-chip .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .cov-chip.full .dot { background: var(--good); }
+  .cov-chip.partial .dot { background: var(--amber); }
+  .cov-chip.manual .dot { background: var(--text-dim); }
+
+  /* ── Analysis Drawer ── */
+  .analysis-drawer {
+    background: #111418;
+    border-top: 1px solid var(--hairline);
+    padding: 20px 56px 24px;
+    position: relative;
+  }
+  .analysis-drawer::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--signal) 0%, transparent 50%);
+    opacity: 0.3;
+  }
+
+  /* Stats strip */
+  .stats-strip {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .stats-strip::before {
+    content: 'MEASUREMENT SUMMARY';
+    position: absolute;
+    top: -8px; left: 10px;
+    font-family: var(--sans);
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--text-dim);
+    background: #111418;
+    padding: 0 4px;
+  }
+  .stat-cell {
+    flex: 1;
+    padding: 12px 16px;
+    border-right: 1px solid var(--hairline);
+    text-align: center;
+  }
+  .stat-cell:last-child { border-right: none; }
+  .stat-label {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--signal);
+    line-height: 1;
+  }
+  .stat-value.secondary { color: var(--text-primary); font-size: 18px; }
+  .stat-unit {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    letter-spacing: 0.06em;
+  }
+
+  /* Two-column layout for drawer */
+  .drawer-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .drawer-section {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  /* Corner ticks */
+  .drawer-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 6px; height: 6px;
+    border-top: 1px solid var(--hairline-2);
+    border-left: 1px solid var(--hairline-2);
+  }
+  .drawer-section::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 6px; height: 6px;
+    border-bottom: 1px solid var(--hairline-2);
+    border-right: 1px solid var(--hairline-2);
+  }
+
+  .drawer-section-head {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--hairline);
+    background: rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .drawer-section-title {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .drawer-section-meta {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+
+  /* Per-class measurement table */
+  .measure-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .measure-table th {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 7px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--hairline);
+    background: rgba(0,0,0,0.15);
+    white-space: nowrap;
+  }
+  .measure-table th:first-child { text-align: left; }
+  .measure-table td {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(43,49,59,0.5);
+    text-align: right;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .measure-table td:first-child {
+    text-align: left;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+  .measure-table tr:last-child td { border-bottom: none; }
+  .measure-table tr:hover td { background: var(--panel-lift); }
+  .measure-table .support { color: var(--text-dim); }
+
+  /* F1 score bar */
+  .f1-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+  .f1-bar-wrap {
+    width: 36px;
+    height: 3px;
+    background: var(--hairline);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .f1-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--signal);
+    opacity: 0.6;
+  }
+  .f1-bad .f1-bar { background: var(--rust); }
+  .f1-ok .f1-bar { background: var(--amber); }
+
+  /* ── Confusion matrix ── */
+  .confusion-grid {
+    padding: 12px;
+    overflow-x: auto;
+  }
+  .confusion-label {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  table.confusion {
+    border-collapse: collapse;
+    margin: 0 auto;
+    width: 100%;
+  }
+  table.confusion th, table.confusion td {
+    font-family: var(--mono);
+    font-size: 10px;
+    width: 60px;
+    height: 34px;
+    text-align: center;
+    border: 1px solid var(--hairline);
+    padding: 4px 3px;
+  }
+  table.confusion th {
+    background: rgba(0,0,0,0.2);
+    color: var(--text-dim);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    width: 72px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  table.confusion th.row-head { width: 84px; text-align: right; font-size: 9px; }
+  table.confusion td { color: var(--text-muted); }
+  table.confusion td.diag {
+    background: rgba(63,182,176,0.12);
+    color: var(--signal);
+    font-weight: 600;
+  }
+  table.confusion td.err { color: var(--rust); opacity: 0.85; }
+  table.confusion .corner { background: transparent; border: none; }
+  .axis-label {
+    font-family: var(--sans);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px;
+    text-align: center;
+  }
+
+  /* ── Taxonomy coverage ── */
+  .coverage-section {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0;
+    position: relative;
+  }
+  .coverage-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 6px; height: 6px;
+    border-top: 1px solid var(--hairline-2);
+    border-left: 1px solid var(--hairline-2);
+  }
+
+  .coverage-bucket {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .coverage-bucket:last-child { border-bottom: none; }
+  .bucket-label {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bucket-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--hairline);
+  }
+  .chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tax-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 5px 8px;
+    border-radius: 2px;
+    border: 1px solid transparent;
+    min-width: 90px;
+    position: relative;
+    overflow: hidden;
+  }
+  .tax-chip-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: inherit;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .tax-chip-score {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .tax-chip-bar {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px;
+    border-radius: 0;
+  }
+  .tax-chip.good {
+    background: var(--good-dim);
+    border-color: rgba(63,166,106,0.3);
+    color: var(--good);
+  }
+  .tax-chip.good .tax-chip-bar { background: var(--good); }
+  .tax-chip.ok {
+    background: var(--amber-dim);
+    border-color: rgba(209,162,74,0.3);
+    color: var(--amber);
+  }
+  .tax-chip.ok .tax-chip-bar { background: var(--amber); }
+  .tax-chip.bad {
+    background: var(--rust-dim);
+    border-color: rgba(194,107,94,0.3);
+    color: var(--rust);
+  }
+  .tax-chip.bad .tax-chip-bar { background: var(--rust); }
+  .tax-chip.untested {
+    background: transparent;
+    border: 1px dashed var(--hairline-2);
+    color: var(--text-dim);
+  }
+  .tax-chip.unsupported {
+    background: rgba(30,34,42,0.6);
+    border-color: var(--hairline);
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+
+  /* Re-aggregate control */
+  .reagg-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-top: 14px;
+    gap: 10px;
+  }
+  .reagg-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--hairline-2);
+    border-radius: 3px;
+    padding: 5px 12px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .reagg-btn:hover { color: var(--text-primary); border-color: var(--hairline-2); background: var(--panel); }
+  .reagg-icon { font-size: 12px; }
+  .cal-stamp {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    border: 1px solid var(--hairline);
+    padding: 3px 8px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .cal-stamp::before {
+    content: '';
+    width: 5px; height: 5px;
+    background: var(--signal);
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+
+  /* MOCKUP label */
+  .mockup-label {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 2px;
+    padding: 5px 10px;
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  /* Scrollable table wrapper */
+  .table-scroll { overflow-x: auto; }
+
+  /* Axis labels for confusion */
+  .confusion-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .confusion-row-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .axis-v {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-family: var(--sans);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Masthead ── -->
+<header class="masthead">
+  <div class="brand">
+    <span class="brand-name">Artha <span>Leaderboard</span></span>
+    <span class="brand-tagline">predictions in → scored against ground truth → on the board</span>
+  </div>
+  <div class="masthead-right">
+    <div class="toggle-group">
+      <button class="toggle-btn active">Best run</button>
+      <button class="toggle-btn">Latest run</button>
+    </div>
+    <button class="gear-btn" title="Settings">⚙</button>
+  </div>
+</header>
+
+<!-- ── Tab nav ── -->
+<nav class="tab-nav">
+  <button class="tab">Home</button>
+  <button class="tab">Segmentation</button>
+  <button class="tab active">Classification</button>
+  <button class="tab">Extraction</button>
+  <button class="tab">Segregation</button>
+  <button class="tab">Taxonomy</button>
+</nav>
+
+<!-- ── Main ── -->
+<main class="main">
+
+  <!-- Control bar -->
+  <div class="control-bar">
+    <div class="control-bar-left">
+      <div class="select-wrap">
+        <select>
+          <option>V1 — 250 docs</option>
+          <option>V2 — 400 docs</option>
+        </select>
+      </div>
+      <div class="gt-chip">GT: 250 docs</div>
+    </div>
+    <div class="control-bar-right">
+      <button class="btn">+ Dataset</button>
+      <button class="btn">Upload GT</button>
+      <button class="btn btn-primary">+ Add run</button>
+      <button class="btn">Manual entry</button>
+    </div>
+  </div>
+
+  <!-- Section label -->
+  <div class="section-label">Classification board · V1 · 250 docs</div>
+
+  <!-- Board panel -->
+  <div class="board-panel">
+    <div class="table-scroll">
+      <table class="board-table">
+        <thead>
+          <tr>
+            <th style="width:36px; text-align:center; padding: 9px 8px;">#</th>
+            <th>Model config</th>
+            <th class="num">accuracy</th>
+            <th class="num">macro_f1</th>
+            <th class="num">out_of_scope</th>
+            <th>ckpt</th>
+            <th class="num">runs</th>
+            <th>when</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- Row 1: Winner + expanded -->
+          <tr class="winner expanded" onclick="return false;">
+            <td class="col-rank">◆</td>
+            <td class="col-model">
+              <span class="expand-icon">▸</span>qwen3.5-9b-indic-doc
+            </td>
+            <td class="col-num headline">0.94</td>
+            <td class="col-num">0.91</td>
+            <td class="col-num muted">3</td>
+            <td class="col-ckpt">step-4800</td>
+            <td class="col-runs">5</td>
+            <td class="col-when">2026-08-17 14:22</td>
+          </tr>
+
+          <!-- Model expand: run list -->
+          <tr style="padding:0;">
+            <td colspan="8" style="padding:0; border-right:none;">
+              <div class="model-expand">
+                <div class="model-expand-inner">
+                  <!-- Run list header -->
+                  <div class="run-list-header">
+                    <span>checkpoint</span>
+                    <span>accuracy</span>
+                    <span>coverage</span>
+                    <span>macro_f1</span>
+                    <span>when</span>
+                  </div>
+
+                  <!-- Run 1: expanded -->
+                  <div class="run-row run-expanded">
+                    <div class="run-ckpt">
+                      <span class="run-expand-icon" style="display:inline-block; transform:rotate(90deg); color: var(--signal); border-color: var(--signal);">▸</span>
+                      step-4800
+                    </div>
+                    <div class="run-acc" style="text-align:right;">0.94</div>
+                    <div style="text-align:right;"><span class="cov-chip full"><span class="dot"></span>full</span></div>
+                    <div class="run-acc" style="text-align:right; color: var(--text-muted); font-weight:400;">0.91</div>
+                    <div class="run-when">2026-08-17 14:22</div>
+                  </div>
+
+                  <!-- ── Analysis Drawer ── -->
+                  <div class="analysis-drawer">
+
+                    <!-- Stats strip -->
+                    <div class="stats-strip">
+                      <div class="stat-cell">
+                        <div class="stat-label">accuracy</div>
+                        <div class="stat-value">0.94</div>
+                        <div class="stat-unit">headline · micro</div>
+                      </div>
+                      <div class="stat-cell">
+                        <div class="stat-label">macro-F1</div>
+                        <div class="stat-value secondary">0.91</div>
+                        <div class="stat-unit">per-class mean</div>
+                      </div>
+                      <div class="stat-cell">
+                        <div class="stat-label">scored</div>
+                        <div class="stat-value secondary" style="font-size:18px;">250</div>
+                        <div class="stat-unit">docs · n=250</div>
+                      </div>
+                      <div class="stat-cell">
+                        <div class="stat-label">out of scope</div>
+                        <div class="stat-value secondary" style="font-size:18px; color: var(--text-muted);">3</div>
+                        <div class="stat-unit">rejected items</div>
+                      </div>
+                      <div class="stat-cell">
+                        <div class="stat-label">classes enabled</div>
+                        <div class="stat-value secondary" style="font-size:18px; color: var(--text-muted);">5</div>
+                        <div class="stat-unit">of 140 master</div>
+                      </div>
+                    </div>
+
+                    <!-- Two-col: per-class table + confusion matrix -->
+                    <div class="drawer-cols">
+
+                      <!-- Per-class measurement table -->
+                      <div class="drawer-section">
+                        <div class="drawer-section-head">
+                          <span class="drawer-section-title">Per-class measurement log · worst first</span>
+                          <span class="drawer-section-meta">n = support</span>
+                        </div>
+                        <table class="measure-table">
+                          <thead>
+                            <tr>
+                              <th>class</th>
+                              <th>P</th>
+                              <th>R</th>
+                              <th>F1</th>
+                              <th>n</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>bank_statement</td>
+                              <td>0.72</td>
+                              <td>0.65</td>
+                              <td>
+                                <div class="f1-cell f1-bad">
+                                  0.68
+                                  <div class="f1-bar-wrap"><div class="f1-bar" style="width:68%;"></div></div>
+                                </div>
+                              </td>
+                              <td class="support">22</td>
+                            </tr>
+                            <tr>
+                              <td>form_16</td>
+                              <td>0.78</td>
+                              <td>0.70</td>
+                              <td>
+                                <div class="f1-cell f1-ok">
+                                  0.74
+                                  <div class="f1-bar-wrap"><div class="f1-bar" style="width:74%;"></div></div>
+                                </div>
+                              </td>
+                              <td class="support">14</td>
+                            </tr>
+                            <tr>
+                              <td>rent_agreement</td>
+                              <td>0.83</td>
+                              <td>0.88</td>
+                              <td>
+                                <div class="f1-cell">
+                                  0.85
+                                  <div class="f1-bar-wrap"><div class="f1-bar" style="width:85%;"></div></div>
+                                </div>
+                              </td>
+                              <td class="support">31</td>
+                            </tr>
+                            <tr>
+                              <td>aadhaar_front</td>
+                              <td>0.97</td>
+                              <td>0.99</td>
+                              <td>
+                                <div class="f1-cell">
+                                  0.98
+                                  <div class="f1-bar-wrap"><div class="f1-bar" style="width:98%;"></div></div>
+                                </div>
+                              </td>
+                              <td class="support">40</td>
+                            </tr>
+                            <tr>
+                              <td>pan_card</td>
+                              <td>0.99</td>
+                              <td>0.98</td>
+                              <td>
+                                <div class="f1-cell">
+                                  0.98
+                                  <div class="f1-bar-wrap"><div class="f1-bar" style="width:98%;"></div></div>
+                                </div>
+                              </td>
+                              <td class="support">38</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <!-- Confusion matrix -->
+                      <div class="drawer-section">
+                        <div class="drawer-section-head">
+                          <span class="drawer-section-title">Confusion matrix · diagonal = correct</span>
+                          <span class="drawer-section-meta">actual rows / predicted cols</span>
+                        </div>
+                        <div class="confusion-grid">
+                          <div class="confusion-wrap">
+                            <div class="confusion-label" style="margin-left:84px;">← predicted →</div>
+                            <div class="confusion-row-wrap">
+                              <div class="axis-v">← actual →</div>
+                              <table class="confusion">
+                                <thead>
+                                  <tr>
+                                    <th class="corner"></th>
+                                    <th title="bank_statement">bank_stmt</th>
+                                    <th title="form_16">form_16</th>
+                                    <th title="rent_agreement">rent_agr</th>
+                                    <th title="aadhaar_front">aadhaar</th>
+                                    <th title="pan_card">pan_card</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr>
+                                    <th class="row-head">bank_stmt</th>
+                                    <td class="diag">14</td>
+                                    <td class="err">3</td>
+                                    <td>2</td>
+                                    <td>0</td>
+                                    <td>0</td>
+                                  </tr>
+                                  <tr>
+                                    <th class="row-head">form_16</th>
+                                    <td class="err">2</td>
+                                    <td class="diag">10</td>
+                                    <td class="err">1</td>
+                                    <td>0</td>
+                                    <td>0</td>
+                                  </tr>
+                                  <tr>
+                                    <th class="row-head">rent_agr</th>
+                                    <td>1</td>
+                                    <td>1</td>
+                                    <td class="diag">27</td>
+                                    <td>0</td>
+                                    <td>0</td>
+                                  </tr>
+                                  <tr>
+                                    <th class="row-head">aadhaar</th>
+                                    <td>0</td>
+                                    <td>0</td>
+                                    <td>0</td>
+                                    <td class="diag">40</td>
+                                    <td>0</td>
+                                  </tr>
+                                  <tr>
+                                    <th class="row-head">pan_card</th>
+                                    <td>0</td>
+                                    <td>0</td>
+                                    <td>0</td>
+                                    <td class="err">1</td>
+                                    <td class="diag">37</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div><!-- /drawer-cols -->
+
+                    <!-- Taxonomy coverage chips -->
+                    <div class="coverage-section" style="margin-bottom:14px;">
+                      <div class="drawer-section-head">
+                        <span class="drawer-section-title">Taxonomy coverage · declared support vs scored</span>
+                        <span class="drawer-section-meta">
+                          <span style="color:var(--good);">●</span>&nbsp;≥0.90&nbsp;&nbsp;
+                          <span style="color:var(--amber);">●</span>&nbsp;≥0.60&nbsp;&nbsp;
+                          <span style="color:var(--rust);">●</span>&nbsp;&lt;0.60&nbsp;&nbsp;
+                          <span style="color:var(--text-dim);">⊡</span>&nbsp;declared&nbsp;&nbsp;
+                          <span style="color:var(--text-dim); opacity:0.5;">●</span>&nbsp;not supported
+                        </span>
+                      </div>
+
+                      <div class="coverage-bucket">
+                        <div class="bucket-label">KYC</div>
+                        <div class="chips-row">
+                          <div class="tax-chip good">
+                            <span class="tax-chip-name">aadhaar_front</span>
+                            <span class="tax-chip-score">0.98</span>
+                            <div class="tax-chip-bar" style="width:98%;"></div>
+                          </div>
+                          <div class="tax-chip good">
+                            <span class="tax-chip-name">pan_card</span>
+                            <span class="tax-chip-score">0.98</span>
+                            <div class="tax-chip-bar" style="width:98%;"></div>
+                          </div>
+                          <div class="tax-chip good">
+                            <span class="tax-chip-name">passport_front</span>
+                            <span class="tax-chip-score">0.92</span>
+                            <div class="tax-chip-bar" style="width:92%;"></div>
+                          </div>
+                          <div class="tax-chip ok">
+                            <span class="tax-chip-name">voter_id</span>
+                            <span class="tax-chip-score">0.76</span>
+                            <div class="tax-chip-bar" style="width:76%;"></div>
+                          </div>
+                          <div class="tax-chip untested">
+                            <span class="tax-chip-name">driving_licence</span>
+                            <span class="tax-chip-score">— declared</span>
+                          </div>
+                          <div class="tax-chip unsupported">
+                            <span class="tax-chip-name">aadhaar_back</span>
+                            <span class="tax-chip-score">—</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="coverage-bucket">
+                        <div class="bucket-label">Financial</div>
+                        <div class="chips-row">
+                          <div class="tax-chip bad">
+                            <span class="tax-chip-name">bank_statement</span>
+                            <span class="tax-chip-score">0.68</span>
+                            <div class="tax-chip-bar" style="width:68%;"></div>
+                          </div>
+                          <div class="tax-chip ok">
+                            <span class="tax-chip-name">form_16</span>
+                            <span class="tax-chip-score">0.74</span>
+                            <div class="tax-chip-bar" style="width:74%;"></div>
+                          </div>
+                          <div class="tax-chip good">
+                            <span class="tax-chip-name">salary_slip</span>
+                            <span class="tax-chip-score">0.91</span>
+                            <div class="tax-chip-bar" style="width:91%;"></div>
+                          </div>
+                          <div class="tax-chip untested">
+                            <span class="tax-chip-name">itr_v</span>
+                            <span class="tax-chip-score">— declared</span>
+                          </div>
+                          <div class="tax-chip unsupported">
+                            <span class="tax-chip-name">ca_certificate</span>
+                            <span class="tax-chip-score">—</span>
+                          </div>
+                          <div class="tax-chip unsupported">
+                            <span class="tax-chip-name">p&l_statement</span>
+                            <span class="tax-chip-score">—</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="coverage-bucket">
+                        <div class="bucket-label">Property</div>
+                        <div class="chips-row">
+                          <div class="tax-chip good">
+                            <span class="tax-chip-name">rent_agreement</span>
+                            <span class="tax-chip-score">0.85</span>
+                            <div class="tax-chip-bar" style="width:85%;"></div>
+                          </div>
+                          <div class="tax-chip untested">
+                            <span class="tax-chip-name">sale_deed</span>
+                            <span class="tax-chip-score">— declared</span>
+                          </div>
+                          <div class="tax-chip unsupported">
+                            <span class="tax-chip-name">registry_doc</span>
+                            <span class="tax-chip-score">—</span>
+                          </div>
+                          <div class="tax-chip unsupported">
+                            <span class="tax-chip-name">property_tax</span>
+                            <span class="tax-chip-score">—</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Re-aggregate + calibration stamp -->
+                    <div class="reagg-row">
+                      <div class="cal-stamp">REF: V1 / 250 · step-4800 · 2026-08-17</div>
+                      <button class="reagg-btn">
+                        <span class="reagg-icon">↻</span> re-aggregate
+                      </button>
+                    </div>
+
+                  </div><!-- /analysis-drawer -->
+
+                  <!-- Run 2 -->
+                  <div class="run-row">
+                    <div class="run-ckpt">
+                      <span class="run-expand-icon">▸</span>
+                      step-4200
+                    </div>
+                    <div class="run-acc" style="text-align:right;">0.93</div>
+                    <div style="text-align:right;"><span class="cov-chip partial"><span class="dot"></span>partial −7</span></div>
+                    <div class="run-acc" style="text-align:right; color: var(--text-muted); font-weight:400;">0.89</div>
+                    <div class="run-when">2026-08-16 22:05</div>
+                  </div>
+
+                  <!-- Run 3 -->
+                  <div class="run-row">
+                    <div class="run-ckpt">
+                      <span class="run-expand-icon">▸</span>
+                      step-3900
+                    </div>
+                    <div class="run-acc" style="text-align:right;">0.91</div>
+                    <div style="text-align:right;"><span class="cov-chip manual"><span class="dot"></span>manual</span></div>
+                    <div class="run-acc" style="text-align:right; color: var(--text-muted); font-weight:400;">0.87</div>
+                    <div class="run-when">2026-08-16 14:33</div>
+                  </div>
+
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Row 2 -->
+          <tr>
+            <td class="col-rank">2</td>
+            <td class="col-model">
+              <span class="expand-icon">▸</span>gemma-3-12b-doc
+            </td>
+            <td class="col-num headline">0.92</td>
+            <td class="col-num">0.88</td>
+            <td class="col-num muted">5</td>
+            <td class="col-ckpt">step-3600</td>
+            <td class="col-runs">4</td>
+            <td class="col-when">2026-08-17 09:10</td>
+          </tr>
+
+          <!-- Row 3 -->
+          <tr>
+            <td class="col-rank">3</td>
+            <td class="col-model">
+              <span class="expand-icon">▸</span>internvl2-8b-kyc
+            </td>
+            <td class="col-num headline">0.89</td>
+            <td class="col-num">0.84</td>
+            <td class="col-num muted">8</td>
+            <td class="col-ckpt">step-2200</td>
+            <td class="col-runs">3</td>
+            <td class="col-when">2026-08-16 20:41</td>
+          </tr>
+
+          <!-- Row 4 -->
+          <tr>
+            <td class="col-rank">4</td>
+            <td class="col-model">
+              <span class="expand-icon">▸</span>pixtral-12b-base
+            </td>
+            <td class="col-num headline">0.85</td>
+            <td class="col-num">0.79</td>
+            <td class="col-num muted">12</td>
+            <td class="col-ckpt">v0-cold</td>
+            <td class="col-runs">2</td>
+            <td class="col-when">2026-08-16 11:03</td>
+          </tr>
+
+          <!-- Row 5 -->
+          <tr>
+            <td class="col-rank">5</td>
+            <td class="col-model">
+              <span class="expand-icon">▸</span>docowl-1.5-7b
+            </td>
+            <td class="col-num headline">0.81</td>
+            <td class="col-num">0.74</td>
+            <td class="col-num muted">15</td>
+            <td class="col-ckpt">step-900</td>
+            <td class="col-runs">1</td>
+            <td class="col-when">2026-08-15 18:30</td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div><!-- /table-scroll -->
+  </div><!-- /board-panel -->
+
+</main>
+
+<!-- MOCKUP label -->
+<div class="mockup-label">MOCKUP · synthetic data</div>
+
+</body>
+</html>

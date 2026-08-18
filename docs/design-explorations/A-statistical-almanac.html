@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artha Leaderboard — Classification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Libre+Franklin:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+
+/* ─── Tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --ground:     #eef0f1;
+  --ink:        #15171b;
+  --ink-faint:  #3a3d43;
+  --slate:      #4a5568;
+  --rule:       #c9ccd0;
+  --rule-med:   #adb2ba;
+  --oxblood:    #7a1f2b;
+  --oxblood-lt: #f3ecee;
+
+  --cov-full-bg:    #d4e8dc;
+  --cov-full-ink:   #1e5a3a;
+  --cov-full-rule:  #6daf8a;
+  --cov-part-bg:    #f0e8cc;
+  --cov-part-ink:   #8a6d1f;
+  --cov-part-rule:  #c9a83a;
+  --cov-man-bg:     #e8eaed;
+  --cov-man-ink:    #4a5568;
+  --cov-man-rule:   #adb2ba;
+
+  --chip-good-bg:   #d4e8dc;
+  --chip-good-ink:  #1e5a3a;
+  --chip-ok-bg:     #f0e8cc;
+  --chip-ok-ink:    #8a6d1f;
+  --chip-bad-bg:    #f5ddd9;
+  --chip-bad-ink:   #7a1f2b;
+  --chip-grey-bg:   #e3e5e8;
+  --chip-grey-ink:  #6b7280;
+
+  --ff-serif:  'Spectral', Georgia, serif;
+  --ff-body:   'Libre Franklin', system-ui, sans-serif;
+  --ff-mono:   'Roboto Mono', 'Courier New', monospace;
+
+  --drawer-bg: #e9ebec;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────── */
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--ff-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ─── MOCKUP corner label ────────────────────────────────────────────── */
+.mockup-label {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: var(--ink);
+  color: #eef0f1;
+  font-family: var(--ff-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  padding: 4px 8px;
+  z-index: 9999;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+/* ─── Layout wrapper ─────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 28px 48px;
+}
+
+/* ─── MASTHEAD ───────────────────────────────────────────────────────── */
+.masthead {
+  padding: 20px 0 0;
+}
+
+.masthead-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+}
+
+.masthead-wordmark {
+  font-family: var(--ff-serif);
+  font-weight: 800;
+  font-size: 2.15rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.masthead-tagline {
+  font-family: var(--ff-body);
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--slate);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.masthead-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--ff-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--slate);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule);
+  padding: 4px 10px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.settings-toggle:hover { border-color: var(--rule-med); color: var(--ink); }
+
+.gear-icon {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+/* Double rule nameplate */
+.masthead-rule-double {
+  border: none;
+  border-top: 3px solid var(--ink);
+  position: relative;
+  margin-top: 2px;
+}
+.masthead-rule-double::after {
+  content: '';
+  display: block;
+  border-top: 1px solid var(--ink);
+  margin-top: 3px;
+}
+
+/* ─── TAB NAV ────────────────────────────────────────────────────────── */
+.tab-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--rule);
+  margin-top: 0;
+}
+
+.tab-item {
+  font-family: var(--ff-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--slate);
+  padding: 11px 16px 9px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.tab-item:hover { color: var(--ink); }
+.tab-item.active {
+  color: var(--oxblood);
+  border-bottom-color: var(--oxblood);
+}
+
+/* ─── CONTROL BAR ────────────────────────────────────────────────────── */
+.control-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 12px;
+  flex-wrap: wrap;
+}
+
+.control-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.control-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Dataset dropdown */
+.dataset-select {
+  font-family: var(--ff-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink);
+  border: 1px solid var(--rule-med);
+  background: #e5e7e9;
+  padding: 5px 28px 5px 10px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%234a5568' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  cursor: pointer;
+}
+.dataset-select:focus { outline: 1px solid var(--oxblood); }
+
+/* GT chip */
+.gt-chip {
+  font-family: var(--ff-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--cov-full-ink);
+  background: var(--cov-full-bg);
+  border: 1px solid var(--cov-full-rule);
+  padding: 4px 8px;
+  letter-spacing: 0.03em;
+}
+
+/* Buttons */
+.btn {
+  font-family: var(--ff-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule-med);
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--slate);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn:hover { border-color: var(--ink); color: var(--ink); }
+
+.btn-primary {
+  background: var(--oxblood);
+  color: #fff;
+  border-color: var(--oxblood);
+}
+.btn-primary:hover { background: #621828; border-color: #621828; color: #fff; }
+
+/* ─── SECTION HEADER ─────────────────────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0 6px;
+  border-top: 1px solid var(--rule-med);
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-family: var(--ff-serif);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.section-meta {
+  font-family: var(--ff-body);
+  font-size: 0.68rem;
+  color: var(--slate);
+  letter-spacing: 0.03em;
+}
+
+/* ─── BOARD TABLE ────────────────────────────────────────────────────── */
+.board-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--rule-med);
+  border-top: none;
+}
+
+.board-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Column headers */
+.board-table thead tr {
+  border-bottom: 2px solid var(--ink);
+}
+
+.board-table th {
+  font-family: var(--ff-body);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--slate);
+  padding: 7px 12px;
+  text-align: left;
+  white-space: nowrap;
+  border-right: 1px solid var(--rule);
+  background: var(--ground);
+}
+.board-table th:last-child { border-right: none; }
+.board-table th.num { text-align: right; }
+
+/* Rows */
+.board-table tbody tr {
+  border-bottom: 1px solid var(--rule);
+}
+.board-table tbody tr:last-child { border-bottom: none; }
+
+.board-table tbody tr:hover > td {
+  background: rgba(0,0,0,0.025);
+}
+
+.board-table td {
+  padding: 9px 12px;
+  border-right: 1px solid var(--rule);
+  vertical-align: top;
+}
+.board-table td:last-child { border-right: none; }
+
+.board-table td.num {
+  font-family: var(--ff-mono);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.board-table td.mono-sm {
+  font-family: var(--ff-mono);
+  font-size: 0.72rem;
+  color: var(--slate);
+}
+
+.board-table td.when {
+  font-family: var(--ff-mono);
+  font-size: 0.68rem;
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+/* Winner row */
+.row-winner > td {
+  background: #f5eced !important;
+}
+.row-winner > td:first-child {
+  border-left: 3px solid var(--oxblood);
+  padding-left: 9px;
+}
+
+/* Rank number */
+.rank-num {
+  font-family: var(--ff-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--rule-med);
+  margin-right: 6px;
+  vertical-align: baseline;
+  line-height: 1;
+}
+.row-winner .rank-num { color: var(--oxblood); }
+
+/* Model name cell */
+.model-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.expand-btn {
+  font-family: var(--ff-mono);
+  font-size: 0.65rem;
+  color: var(--slate);
+  cursor: pointer;
+  user-select: none;
+  min-width: 14px;
+  transition: color 0.12s;
+  border: none;
+  background: none;
+  padding: 0;
+}
+.expand-btn:hover { color: var(--ink); }
+.expand-btn.open { color: var(--oxblood); }
+
+.model-name {
+  font-family: var(--ff-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.row-winner .model-name { font-weight: 500; }
+
+/* Metric highlight */
+.metric-headline {
+  font-weight: 500;
+  color: var(--ink);
+}
+.row-winner .metric-headline { color: var(--oxblood); font-weight: 500; }
+
+/* Runs count badge */
+.runs-count {
+  display: inline-block;
+  font-family: var(--ff-mono);
+  font-size: 0.68rem;
+  color: var(--slate);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  padding: 1px 6px;
+  min-width: 22px;
+  text-align: center;
+}
+
+/* ─── EXPANDED MODEL: run sub-rows ─────────────────────────────────── */
+.runs-subrow td {
+  background: #e6e8e9 !important;
+  padding: 0 !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--rule);
+}
+
+.runs-subrow-inner {
+  padding: 0 0 0 44px;
+}
+
+.run-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.run-item {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.78rem;
+}
+.run-item:last-child { border-bottom: none; }
+
+.run-item-expand {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px 8px 4px;
+}
+.run-expand-btn {
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  color: var(--slate);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  user-select: none;
+  min-width: 12px;
+}
+.run-expand-btn.open { color: var(--oxblood); }
+
+.run-item-ckpt {
+  font-family: var(--ff-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 8px 16px 8px 4px;
+  display: flex;
+  align-items: center;
+  min-width: 110px;
+}
+
+.run-item-metrics {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  padding: 8px 0;
+}
+
+.run-metric {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+}
+.run-metric-label {
+  font-family: var(--ff-body);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+.run-metric-val {
+  font-family: var(--ff-mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Coverage badges */
+.cov-badge {
+  font-family: var(--ff-body);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid;
+  padding: 2px 7px;
+  white-space: nowrap;
+  display: inline-block;
+}
+.cov-full {
+  background: var(--cov-full-bg);
+  color: var(--cov-full-ink);
+  border-color: var(--cov-full-rule);
+}
+.cov-partial {
+  background: var(--cov-part-bg);
+  color: var(--cov-part-ink);
+  border-color: var(--cov-part-rule);
+}
+.cov-manual {
+  background: var(--cov-man-bg);
+  color: var(--cov-man-ink);
+  border-color: var(--cov-man-rule);
+}
+
+.run-item-when {
+  font-family: var(--ff-mono);
+  font-size: 0.67rem;
+  color: var(--slate);
+  padding: 8px 12px 8px 16px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* ─── ANALYSIS DRAWER ────────────────────────────────────────────────── */
+.drawer-row td {
+  background: var(--drawer-bg) !important;
+  padding: 0 !important;
+  border: none !important;
+  border-bottom: 1px solid var(--rule-med) !important;
+}
+
+.drawer-inner {
+  padding: 0 20px 24px 44px;
+  border-top: 3px solid var(--ink);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 10px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 16px;
+}
+
+.drawer-run-id {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.drawer-label {
+  font-family: var(--ff-serif);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+.drawer-run-name {
+  font-family: var(--ff-mono);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Stats strip */
+.stats-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  background: #e1e3e5;
+  border: 1px solid var(--rule);
+  margin-bottom: 20px;
+}
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px;
+  border-right: 1px solid var(--rule);
+  min-width: 110px;
+}
+.stat-cell:last-child { border-right: none; }
+.stat-lbl {
+  font-family: var(--ff-body);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin-bottom: 2px;
+}
+.stat-val {
+  font-family: var(--ff-mono);
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.stat-val.accent { color: var(--oxblood); }
+
+/* Two-column layout for drawer content */
+.drawer-columns {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Per-class table */
+.analysis-section-title {
+  font-family: var(--ff-serif);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--slate);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule-med);
+  margin-bottom: 8px;
+}
+
+.per-class-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.per-class-table th {
+  font-family: var(--ff-body);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--slate);
+  padding: 5px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--rule-med);
+  border-right: 1px solid var(--rule);
+  white-space: nowrap;
+}
+.per-class-table th:first-child { text-align: left; }
+.per-class-table th:last-child { border-right: none; }
+
+.per-class-table td {
+  font-family: var(--ff-mono);
+  font-size: 0.73rem;
+  padding: 5px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  color: var(--ink);
+}
+.per-class-table td:first-child {
+  text-align: left;
+  font-family: var(--ff-mono);
+  font-size: 0.71rem;
+  color: var(--ink-faint);
+}
+.per-class-table td:last-child { border-right: none; }
+.per-class-table tbody tr:last-child td { border-bottom: none; }
+
+/* Score coloring by value */
+.score-weak { color: var(--oxblood); }
+.score-mid  { color: var(--cov-part-ink); }
+.score-good { color: var(--cov-full-ink); }
+
+/* Worst marker */
+.worst-marker {
+  display: inline-block;
+  font-family: var(--ff-body);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  border: 1px solid var(--oxblood);
+  padding: 0 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+/* Right column: confusion + coverage */
+.drawer-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Confusion matrix */
+.confusion-wrap {
+  overflow-x: auto;
+}
+
+.confusion-matrix {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.confusion-matrix td,
+.confusion-matrix th {
+  border: 1px solid var(--rule);
+  padding: 0;
+  text-align: center;
+}
+
+.confusion-matrix .cm-header-cell {
+  font-family: var(--ff-mono);
+  font-size: 0.57rem;
+  color: var(--slate);
+  padding: 3px 5px;
+  background: #e1e3e5;
+  white-space: nowrap;
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  writing-mode: horizontal-tb;
+  letter-spacing: -0.01em;
+}
+
+.confusion-matrix .cm-row-header {
+  font-family: var(--ff-mono);
+  font-size: 0.57rem;
+  color: var(--slate);
+  padding: 4px 6px;
+  background: #e1e3e5;
+  white-space: nowrap;
+  text-align: right;
+  min-width: 82px;
+  letter-spacing: -0.01em;
+}
+
+.cm-corner {
+  background: #d8dadc;
+  font-family: var(--ff-body);
+  font-size: 0.55rem;
+  color: var(--slate);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 3px 5px;
+  text-align: center;
+}
+
+.cm-cell {
+  font-family: var(--ff-mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  padding: 5px 8px;
+  min-width: 44px;
+  text-align: center;
+}
+.cm-cell.diag {
+  font-weight: 500;
+  background: #d8e8dd;
+  color: var(--cov-full-ink);
+}
+.cm-cell.error-hi {
+  color: var(--oxblood);
+  background: #f5e4e4;
+}
+.cm-cell.error-lo {
+  color: var(--cov-part-ink);
+}
+.cm-cell.zero {
+  color: var(--rule-med);
+}
+
+/* Predicted axis label */
+.cm-pred-label {
+  font-family: var(--ff-body);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate);
+  text-align: center;
+  padding: 2px 0 4px;
+}
+
+/* Coverage chips */
+.coverage-section {}
+
+.bucket-group {
+  margin-bottom: 12px;
+}
+.bucket-group:last-child { margin-bottom: 0; }
+
+.bucket-label {
+  font-family: var(--ff-body);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bucket-label::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--rule);
+}
+
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.chip-good { background: var(--chip-good-bg); color: var(--chip-good-ink); border-color: var(--cov-full-rule); }
+.chip-ok   { background: var(--chip-ok-bg);   color: var(--chip-ok-ink);   border-color: var(--cov-part-rule); }
+.chip-bad  { background: var(--chip-bad-bg);   color: var(--chip-bad-ink);  border-color: #d09090; }
+.chip-dash { background: transparent; color: var(--slate); border-color: var(--rule); border-style: dashed; }
+.chip-grey { background: var(--chip-grey-bg);  color: var(--chip-grey-ink); border-color: var(--rule); }
+
+.chip-score {
+  font-weight: 500;
+}
+
+/* Re-aggregate control */
+.reagg-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  margin-top: 4px;
+}
+.reagg-btn {
+  font-family: var(--ff-body);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--slate);
+  border: 1px solid var(--rule-med);
+  padding: 4px 12px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.reagg-btn:hover { color: var(--ink); border-color: var(--ink); }
+.reagg-icon { font-size: 0.85rem; line-height: 1; }
+
+/* ─── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .drawer-columns { grid-template-columns: 1fr; }
+  .masthead-wordmark { font-size: 1.65rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="mockup-label">MOCKUP · synthetic data</div>
+
+<div class="page">
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <div class="masthead-top">
+      <div>
+        <div class="masthead-wordmark">Artha Leaderboard</div>
+        <div class="masthead-tagline">predictions in &rarr; scored against ground truth &rarr; on the board</div>
+      </div>
+      <div class="masthead-settings">
+        <button class="settings-toggle">
+          <svg class="gear-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="2.5"/>
+            <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke-linecap="round"/>
+          </svg>
+          Best run
+          <svg viewBox="0 0 8 5" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="margin-left:2px"><path d="M1 1l3 3 3-3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="masthead-rule-double"></div>
+  </header>
+
+  <!-- TAB NAV -->
+  <nav class="tab-nav" aria-label="Task navigation">
+    <button class="tab-item">Home</button>
+    <button class="tab-item">Segmentation</button>
+    <button class="tab-item active" aria-current="page">Classification</button>
+    <button class="tab-item">Extraction</button>
+    <button class="tab-item">Segregation</button>
+    <button class="tab-item">Taxonomy</button>
+  </nav>
+
+  <!-- CONTROL BAR -->
+  <div class="control-bar">
+    <div class="control-bar-left">
+      <select class="dataset-select" aria-label="Dataset">
+        <option>V1 — 250 docs</option>
+        <option>V2 — 400 docs</option>
+      </select>
+      <span class="gt-chip">GT: 250 docs</span>
+    </div>
+    <div class="control-bar-right">
+      <button class="btn">+ Dataset</button>
+      <button class="btn">Upload GT</button>
+      <button class="btn btn-primary">+ Add run</button>
+      <button class="btn">Manual entry</button>
+    </div>
+  </div>
+
+  <!-- BOARD SECTION HEADER -->
+  <div class="section-header">
+    <span class="section-title">Classification Standings</span>
+    <span class="section-meta">sorted by accuracy · dataset V1 · 5 configs</span>
+  </div>
+
+  <!-- BOARD TABLE -->
+  <div class="board-wrap">
+    <table class="board-table" aria-label="Classification leaderboard">
+      <thead>
+        <tr>
+          <th style="width:36px; text-align:center;">#</th>
+          <th>Model config</th>
+          <th class="num">Accuracy</th>
+          <th class="num">Macro F1</th>
+          <th class="num">Out-of-scope</th>
+          <th>Ckpt</th>
+          <th class="num" style="text-align:center;">Runs</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- ── ROW 1: WINNER (expanded) ── -->
+        <tr class="row-winner">
+          <td style="text-align:center; padding:9px 6px;">
+            <span class="rank-num">1</span>
+          </td>
+          <td>
+            <div class="model-cell">
+              <button class="expand-btn open" aria-expanded="true" aria-label="Collapse qwen3.5-9b-indic-doc">▾</button>
+              <span class="model-name">qwen3.5-9b-indic-doc</span>
+            </div>
+          </td>
+          <td class="num metric-headline">0.94</td>
+          <td class="num">0.91</td>
+          <td class="num">3</td>
+          <td class="mono-sm">step-4800</td>
+          <td class="num" style="text-align:center;">
+            <span class="runs-count">5</span>
+          </td>
+          <td class="when">2026-08-17 14:22</td>
+        </tr>
+
+        <!-- EXPANDED MODEL: run list sub-row -->
+        <tr class="runs-subrow">
+          <td colspan="8">
+            <div class="runs-subrow-inner">
+              <div class="run-list">
+
+                <!-- Run A — expanded into drawer -->
+                <div class="run-item">
+                  <div class="run-item-expand">
+                    <button class="run-expand-btn open" aria-expanded="true" aria-label="Collapse run step-4800">▾</button>
+                  </div>
+                  <div class="run-item-ckpt">step-4800</div>
+                  <div class="run-item-metrics">
+                    <div class="run-metric">
+                      <span class="run-metric-label">acc</span>
+                      <span class="run-metric-val">0.94</span>
+                    </div>
+                    <div class="run-metric">
+                      <span class="run-metric-label">F1</span>
+                      <span class="run-metric-val">0.91</span>
+                    </div>
+                    <span class="cov-badge cov-full">full</span>
+                  </div>
+                  <div class="run-item-when">2026-08-17 14:22</div>
+                </div>
+
+                <!-- ── ANALYSIS DRAWER (nested inside run-list, spans full width) ── -->
+                <div style="border-bottom: 1px solid var(--rule);">
+                  <div class="drawer-inner">
+
+                    <!-- Drawer header -->
+                    <div class="drawer-header">
+                      <div class="drawer-run-id">
+                        <span class="drawer-label">Analysis</span>
+                        <span class="drawer-run-name">qwen3.5-9b-indic-doc / step-4800</span>
+                      </div>
+                      <button class="reagg-btn">
+                        <span class="reagg-icon">↻</span> Re-aggregate
+                      </button>
+                    </div>
+
+                    <!-- Stats strip -->
+                    <div class="stats-strip">
+                      <div class="stat-cell">
+                        <span class="stat-lbl">Accuracy</span>
+                        <span class="stat-val accent">0.94</span>
+                      </div>
+                      <div class="stat-cell">
+                        <span class="stat-lbl">Macro F1</span>
+                        <span class="stat-val">0.91</span>
+                      </div>
+                      <div class="stat-cell">
+                        <span class="stat-lbl">Out-of-scope</span>
+                        <span class="stat-val">3</span>
+                      </div>
+                      <div class="stat-cell">
+                        <span class="stat-lbl">Scored docs</span>
+                        <span class="stat-val">250</span>
+                      </div>
+                      <div class="stat-cell">
+                        <span class="stat-lbl">Coverage</span>
+                        <span class="stat-val" style="font-size:0.85rem; padding-top:4px;"><span class="cov-badge cov-full" style="font-size:0.65rem;">full</span></span>
+                      </div>
+                    </div>
+
+                    <!-- Two-column body -->
+                    <div class="drawer-columns">
+
+                      <!-- LEFT: per-class table -->
+                      <div>
+                        <div class="analysis-section-title">Per-class performance — worst first</div>
+                        <table class="per-class-table" aria-label="Per-class precision recall F1">
+                          <thead>
+                            <tr>
+                              <th>Class</th>
+                              <th>P</th>
+                              <th>R</th>
+                              <th>F1</th>
+                              <th>Support</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>bank_statement <span class="worst-marker">worst</span></td>
+                              <td class="score-weak">0.72</td>
+                              <td class="score-weak">0.65</td>
+                              <td class="score-weak">0.68</td>
+                              <td>22</td>
+                            </tr>
+                            <tr>
+                              <td>form_16</td>
+                              <td class="score-mid">0.78</td>
+                              <td class="score-mid">0.70</td>
+                              <td class="score-mid">0.74</td>
+                              <td>14</td>
+                            </tr>
+                            <tr>
+                              <td>rent_agreement</td>
+                              <td class="score-mid">0.83</td>
+                              <td class="score-mid">0.88</td>
+                              <td class="score-mid">0.85</td>
+                              <td>31</td>
+                            </tr>
+                            <tr>
+                              <td>aadhaar_front</td>
+                              <td class="score-good">0.97</td>
+                              <td class="score-good">0.99</td>
+                              <td class="score-good">0.98</td>
+                              <td>40</td>
+                            </tr>
+                            <tr>
+                              <td>pan_card</td>
+                              <td class="score-good">0.99</td>
+                              <td class="score-good">0.98</td>
+                              <td class="score-good">0.98</td>
+                              <td>38</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <!-- RIGHT: confusion matrix + coverage chips -->
+                      <div class="drawer-right">
+
+                        <!-- Confusion matrix -->
+                        <div class="confusion-wrap">
+                          <div class="analysis-section-title">Confusion matrix</div>
+                          <div class="cm-pred-label">→ Predicted</div>
+                          <table class="confusion-matrix" aria-label="Confusion matrix">
+                            <thead>
+                              <tr>
+                                <th class="cm-corner">Actual ↓</th>
+                                <th><div class="cm-header-cell">bank_stmt</div></th>
+                                <th><div class="cm-header-cell">form_16</div></th>
+                                <th><div class="cm-header-cell">rent_agr</div></th>
+                                <th><div class="cm-header-cell">aadhaar</div></th>
+                                <th><div class="cm-header-cell">pan_card</div></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td class="cm-row-header">bank_statement</td>
+                                <td class="cm-cell diag">14</td>
+                                <td class="cm-cell error-hi">5</td>
+                                <td class="cm-cell error-lo">2</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                              </tr>
+                              <tr>
+                                <td class="cm-row-header">form_16</td>
+                                <td class="cm-cell error-lo">3</td>
+                                <td class="cm-cell diag">10</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                              </tr>
+                              <tr>
+                                <td class="cm-row-header">rent_agreement</td>
+                                <td class="cm-cell error-lo">2</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell diag">27</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                              </tr>
+                              <tr>
+                                <td class="cm-row-header">aadhaar_front</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell diag">40</td>
+                                <td class="cm-cell zero">0</td>
+                              </tr>
+                              <tr>
+                                <td class="cm-row-header">pan_card</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">0</td>
+                                <td class="cm-cell zero">1</td>
+                                <td class="cm-cell diag">37</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <!-- Taxonomy coverage chips -->
+                        <div class="coverage-section">
+                          <div class="analysis-section-title">Taxonomy coverage by bucket</div>
+
+                          <div class="bucket-group">
+                            <div class="bucket-label">KYC</div>
+                            <div class="chips-row">
+                              <span class="chip chip-good"><span>aadhaar_front</span><span class="chip-score">0.98</span></span>
+                              <span class="chip chip-good"><span>pan_card</span><span class="chip-score">0.98</span></span>
+                              <span class="chip chip-ok"><span>aadhaar_back</span><span class="chip-score">0.82</span></span>
+                              <span class="chip chip-dash"><span>voter_id</span><span class="chip-score">—</span></span>
+                              <span class="chip chip-grey"><span>driving_lic</span><span class="chip-score">–</span></span>
+                            </div>
+                          </div>
+
+                          <div class="bucket-group">
+                            <div class="bucket-label">Financial</div>
+                            <div class="chips-row">
+                              <span class="chip chip-bad"><span>bank_statement</span><span class="chip-score">0.68</span></span>
+                              <span class="chip chip-ok"><span>form_16</span><span class="chip-score">0.74</span></span>
+                              <span class="chip chip-ok"><span>itr_ack</span><span class="chip-score">0.79</span></span>
+                              <span class="chip chip-dash"><span>salary_slip</span><span class="chip-score">—</span></span>
+                              <span class="chip chip-grey"><span>form_26as</span><span class="chip-score">–</span></span>
+                            </div>
+                          </div>
+
+                          <div class="bucket-group">
+                            <div class="bucket-label">Property</div>
+                            <div class="chips-row">
+                              <span class="chip chip-ok"><span>rent_agreement</span><span class="chip-score">0.85</span></span>
+                              <span class="chip chip-good"><span>sale_deed</span><span class="chip-score">0.91</span></span>
+                              <span class="chip chip-dash"><span>noc_letter</span><span class="chip-score">—</span></span>
+                              <span class="chip chip-grey"><span>encumbrance</span><span class="chip-score">–</span></span>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div><!-- /.drawer-right -->
+                    </div><!-- /.drawer-columns -->
+
+                  </div><!-- /.drawer-inner -->
+                </div><!-- /drawer block -->
+
+                <!-- Run B -->
+                <div class="run-item">
+                  <div class="run-item-expand">
+                    <button class="run-expand-btn" aria-expanded="false" aria-label="Expand run step-4200">▸</button>
+                  </div>
+                  <div class="run-item-ckpt">step-4200</div>
+                  <div class="run-item-metrics">
+                    <div class="run-metric">
+                      <span class="run-metric-label">acc</span>
+                      <span class="run-metric-val">0.93</span>
+                    </div>
+                    <div class="run-metric">
+                      <span class="run-metric-label">F1</span>
+                      <span class="run-metric-val">0.89</span>
+                    </div>
+                    <span class="cov-badge cov-partial">partial −7</span>
+                  </div>
+                  <div class="run-item-when">2026-08-16 22:05</div>
+                </div>
+
+                <!-- Run C -->
+                <div class="run-item">
+                  <div class="run-item-expand">
+                    <button class="run-expand-btn" aria-expanded="false" aria-label="Expand run step-3600-man">▸</button>
+                  </div>
+                  <div class="run-item-ckpt">step-3600</div>
+                  <div class="run-item-metrics">
+                    <div class="run-metric">
+                      <span class="run-metric-label">acc</span>
+                      <span class="run-metric-val">0.91</span>
+                    </div>
+                    <div class="run-metric">
+                      <span class="run-metric-label">F1</span>
+                      <span class="run-metric-val">0.87</span>
+                    </div>
+                    <span class="cov-badge cov-manual">manual</span>
+                  </div>
+                  <div class="run-item-when">2026-08-16 14:30</div>
+                </div>
+
+              </div><!-- /.run-list -->
+            </div><!-- /.runs-subrow-inner -->
+          </td>
+        </tr>
+
+        <!-- ── ROW 2 ── -->
+        <tr>
+          <td style="text-align:center; padding:9px 6px;">
+            <span class="rank-num">2</span>
+          </td>
+          <td>
+            <div class="model-cell">
+              <button class="expand-btn" aria-expanded="false" aria-label="Expand gemma-3-12b-doc">▸</button>
+              <span class="model-name">gemma-3-12b-doc</span>
+            </div>
+          </td>
+          <td class="num">0.92</td>
+          <td class="num">0.88</td>
+          <td class="num">5</td>
+          <td class="mono-sm">step-3600</td>
+          <td class="num" style="text-align:center;">
+            <span class="runs-count">4</span>
+          </td>
+          <td class="when">2026-08-17 09:10</td>
+        </tr>
+
+        <!-- ── ROW 3 ── -->
+        <tr>
+          <td style="text-align:center; padding:9px 6px;">
+            <span class="rank-num">3</span>
+          </td>
+          <td>
+            <div class="model-cell">
+              <button class="expand-btn" aria-expanded="false" aria-label="Expand internvl2-8b-kyc">▸</button>
+              <span class="model-name">internvl2-8b-kyc</span>
+            </div>
+          </td>
+          <td class="num">0.89</td>
+          <td class="num">0.84</td>
+          <td class="num">8</td>
+          <td class="mono-sm">step-2200</td>
+          <td class="num" style="text-align:center;">
+            <span class="runs-count">3</span>
+          </td>
+          <td class="when">2026-08-16 20:41</td>
+        </tr>
+
+        <!-- ── ROW 4 ── -->
+        <tr>
+          <td style="text-align:center; padding:9px 6px;">
+            <span class="rank-num">4</span>
+          </td>
+          <td>
+            <div class="model-cell">
+              <button class="expand-btn" aria-expanded="false" aria-label="Expand pixtral-12b-base">▸</button>
+              <span class="model-name">pixtral-12b-base</span>
+            </div>
+          </td>
+          <td class="num">0.85</td>
+          <td class="num">0.79</td>
+          <td class="num">12</td>
+          <td class="mono-sm">v0-cold</td>
+          <td class="num" style="text-align:center;">
+            <span class="runs-count">2</span>
+          </td>
+          <td class="when">2026-08-16 11:03</td>
+        </tr>
+
+        <!-- ── ROW 5 ── -->
+        <tr>
+          <td style="text-align:center; padding:9px 6px;">
+            <span class="rank-num">5</span>
+          </td>
+          <td>
+            <div class="model-cell">
+              <button class="expand-btn" aria-expanded="false" aria-label="Expand docowl-1.5-7b">▸</button>
+              <span class="model-name">docowl-1.5-7b</span>
+            </div>
+          </td>
+          <td class="num">0.81</td>
+          <td class="num">0.74</td>
+          <td class="num">15</td>
+          <td class="mono-sm">step-900</td>
+          <td class="num" style="text-align:center;">
+            <span class="runs-count">1</span>
+          </td>
+          <td class="when">2026-08-15 18:30</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div><!-- /.board-wrap -->
+
+</div><!-- /.page -->
+</body>
+</html>

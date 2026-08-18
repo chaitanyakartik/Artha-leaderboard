@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artha Leaderboard — Classification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Libre+Franklin:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset ────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+
+/* ─── Tokens ───────────────────────────────────────────────── */
+:root {
+  --ground:    #0f1524;
+  --panel:     #1a2236;
+  --seam:      #2a3550;
+  --text:      #eef1f7;
+  --muted:     #8996b3;
+  --amber:     #f4a63a;
+  --sky:       #8fb4e8;
+  --sky-dim:   rgba(143, 180, 232, 0.12);
+  --amber-dim: rgba(244, 166, 58, 0.12);
+  --danger:    #e05c5c;
+  --good:      #5cb88a;
+  --ok:        #8fb4e8;
+  --font-board: 'Saira Condensed', sans-serif;
+  --font-mono:  'JetBrains Mono', monospace;
+  --font-ui:    'Libre Franklin', sans-serif;
+}
+
+/* ─── Base ─────────────────────────────────────────────────── */
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  min-height: 100vh;
+  padding-bottom: 64px;
+}
+
+/* ─── Masthead ─────────────────────────────────────────────── */
+.masthead {
+  background: var(--panel);
+  border-bottom: 1px solid var(--seam);
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.masthead-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.brand-name {
+  font-family: var(--font-board);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.brand-tag {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.masthead-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.toggle-group {
+  display: flex;
+  background: var(--ground);
+  border: 1px solid var(--seam);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.toggle-btn {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 5px 12px;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggle-btn.active {
+  background: var(--seam);
+  color: var(--text);
+}
+
+.gear-btn {
+  background: transparent;
+  border: 1px solid var(--seam);
+  border-radius: 3px;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.gear-btn:hover { border-color: var(--muted); color: var(--text); }
+
+/* ─── Tab Nav ──────────────────────────────────────────────── */
+.tab-nav {
+  background: var(--panel);
+  border-bottom: 1px solid var(--seam);
+  padding: 0 32px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.tab {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 18px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  text-decoration: none;
+}
+
+.tab:hover { color: var(--text); }
+
+.tab.active {
+  color: var(--sky);
+  border-bottom-color: var(--sky);
+}
+
+/* ─── Control Bar ──────────────────────────────────────────── */
+.control-bar {
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--seam);
+}
+
+.dataset-select {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--seam);
+  border-radius: 3px;
+  padding: 7px 28px 7px 12px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238996b3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+.gt-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--good);
+  background: rgba(92, 184, 138, 0.1);
+  border: 1px solid rgba(92, 184, 138, 0.3);
+  border-radius: 3px;
+  padding: 4px 10px;
+  letter-spacing: 0.03em;
+}
+
+.spacer { flex: 1; }
+
+.btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  border-radius: 3px;
+  padding: 7px 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--seam);
+  color: var(--muted);
+}
+.btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+
+.btn-primary {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #0f1524;
+  font-weight: 600;
+}
+.btn-primary:hover { background: #f7b94f; border-color: #f7b94f; }
+
+/* ─── Board Container ──────────────────────────────────────── */
+.board-wrap {
+  padding: 24px 32px;
+  overflow-x: auto;
+}
+
+/* ─── Board Header Strip ───────────────────────────────────── */
+.board-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 100px 100px 100px 120px 60px 160px;
+  align-items: center;
+  padding: 0 16px;
+  height: 32px;
+  background: var(--ground);
+  border: 1px solid var(--seam);
+  border-bottom: 2px solid var(--seam);
+  margin-bottom: 0;
+  min-width: 900px;
+}
+
+.col-label {
+  font-family: var(--font-board);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.col-label.num { text-align: right; }
+
+/* ─── Model Row ─────────────────────────────────────────────── */
+.board {
+  min-width: 900px;
+  border: 1px solid var(--seam);
+  border-top: none;
+}
+
+.model-row {
+  border-bottom: 1px solid var(--seam);
+  position: relative;
+}
+
+.model-row:last-child { border-bottom: none; }
+
+.model-row-head {
+  display: grid;
+  grid-template-columns: 40px 1fr 100px 100px 100px 120px 60px 160px;
+  align-items: center;
+  padding: 0 16px;
+  height: 44px;
+  background: var(--panel);
+  cursor: pointer;
+  transition: background 0.12s;
+  position: relative;
+}
+.model-row-head:hover { background: var(--seam); }
+
+/* Leader row */
+.model-row.leader .model-row-head {
+  background: var(--sky-dim);
+  border-left: 3px solid var(--sky);
+}
+.model-row.leader .model-row-head:hover { background: rgba(143, 180, 232, 0.2); }
+
+/* Expand arrow */
+.expand-arrow {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s;
+  display: inline-block;
+  user-select: none;
+}
+.model-row.open .expand-arrow { transform: rotate(90deg); }
+
+.rank {
+  font-family: var(--font-board);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+.leader .rank { color: var(--sky); }
+
+.model-name {
+  font-family: var(--font-board);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leader-tag {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sky);
+  background: var(--sky-dim);
+  border: 1px solid rgba(143, 180, 232, 0.3);
+  border-radius: 2px;
+  padding: 2px 7px;
+}
+
+.flap-cell {
+  text-align: right;
+  padding-right: 4px;
+}
+
+.flap-val {
+  font-family: var(--font-board);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  display: inline-block;
+  background: var(--ground);
+  padding: 2px 6px;
+  border-radius: 2px;
+  border: 1px solid var(--seam);
+  min-width: 56px;
+  text-align: right;
+}
+
+.leader .flap-val { color: var(--sky); }
+
+.flap-val.secondary { font-size: 16px; font-weight: 500; color: var(--muted); }
+.leader .flap-val.secondary { color: var(--text); }
+
+.ckpt-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.runs-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: right;
+}
+
+.when-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* ─── Run List (expanded model) ─────────────────────────────── */
+.run-list {
+  background: var(--ground);
+  border-top: 1px solid var(--seam);
+  display: none;
+}
+.model-row.open .run-list { display: block; }
+
+.run-list-header {
+  display: grid;
+  grid-template-columns: 40px 140px 90px 90px 140px 1fr;
+  padding: 6px 16px 6px 56px;
+  border-bottom: 1px solid var(--seam);
+}
+
+.run-col-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+}
+.run-col-label:first-child { text-align: left; }
+
+.run-row {
+  display: grid;
+  grid-template-columns: 40px 140px 90px 90px 140px 1fr;
+  align-items: center;
+  padding: 10px 16px 10px 56px;
+  border-bottom: 1px solid rgba(42, 53, 80, 0.5);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.run-row:last-child { border-bottom: none; }
+.run-row:hover { background: rgba(26, 34, 54, 0.6); }
+
+/* Partial amber state */
+.run-row.partial {
+  border-left: 3px solid var(--amber);
+  background: var(--amber-dim);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .run-row.partial {
+    animation: amber-pulse 3s ease-in-out infinite;
+  }
+}
+@keyframes amber-pulse {
+  0%, 100% { background: var(--amber-dim); }
+  50%       { background: rgba(244, 166, 58, 0.07); }
+}
+
+.run-expand-arrow {
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.2s;
+  display: inline-block;
+}
+.run-row.open .run-expand-arrow { transform: rotate(90deg); }
+
+.run-ckpt {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.run-metric {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: right;
+}
+
+/* Coverage badge */
+.cov-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  padding: 3px 8px;
+  display: inline-block;
+  text-align: center;
+  justify-self: center;
+}
+.cov-full    { background: rgba(143, 180, 232, 0.15); color: var(--sky); border: 1px solid rgba(143, 180, 232, 0.35); }
+.cov-partial { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(244, 166, 58, 0.4); }
+.cov-manual  { background: rgba(137, 150, 179, 0.12); color: var(--muted); border: 1px solid var(--seam); }
+
+.run-when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* ─── Analysis Drawer ───────────────────────────────────────── */
+.analysis-drawer {
+  display: none;
+  background: #080e1a;
+  border-top: 1px solid var(--seam);
+  padding: 0;
+}
+.run-row.open + .analysis-drawer { display: block; }
+
+/* Boarding Pass Stub */
+.boarding-pass {
+  margin: 20px 24px 20px 56px;
+  background: var(--panel);
+  border: 1px solid var(--seam);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  min-height: 90px;
+}
+
+.bp-main {
+  flex: 1;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-right: none;
+}
+
+.bp-segments {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+
+.bp-seg {
+  padding: 14px 20px;
+  border-left: 1px dashed var(--seam);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.bp-seg-label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bp-seg-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.bp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.bp-run-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.bp-model {
+  font-family: var(--font-board);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.bp-barcode {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--seam);
+  letter-spacing: 0.3em;
+  margin-top: 8px;
+  user-select: none;
+}
+
+.bp-perforations {
+  width: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 8px,
+    var(--seam) 8px,
+    var(--seam) 9px,
+    transparent 9px,
+    transparent 17px
+  );
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+/* ─── Stats Strip ───────────────────────────────────────────── */
+.stats-strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 12px 24px 12px 56px;
+  border-bottom: 1px solid var(--seam);
+  background: rgba(26, 34, 54, 0.5);
+}
+
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 32px;
+  margin-right: 32px;
+  border-right: 1px solid var(--seam);
+}
+.stat-block:last-child { border-right: none; }
+
+.stat-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.stat-val {
+  font-family: var(--font-board);
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--sky);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.stat-val.neutral { color: var(--text); }
+
+.reagg-btn {
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--seam);
+  border-radius: 3px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.reagg-btn:hover { border-color: var(--muted); color: var(--text); }
+
+/* ─── Analysis Sections ─────────────────────────────────────── */
+.analysis-sections {
+  padding: 20px 24px 28px 56px;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+}
+
+.analysis-left { display: flex; flex-direction: column; gap: 24px; }
+.analysis-right { display: flex; flex-direction: column; gap: 24px; }
+
+.section-head {
+  font-family: var(--font-board);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--seam);
+}
+
+/* Per-class table */
+.class-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.class-table th {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--seam);
+}
+.class-table th:first-child { text-align: left; }
+
+.class-table td {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  text-align: right;
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(42, 53, 80, 0.5);
+  vertical-align: middle;
+}
+.class-table td:first-child { text-align: left; color: var(--muted); font-size: 12px; }
+.class-table tr:last-child td { border-bottom: none; }
+
+.class-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* F1 bar */
+.f1-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.f1-bar {
+  width: 60px;
+  height: 4px;
+  background: var(--seam);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.f1-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--sky);
+}
+.f1-fill.bad  { background: var(--danger); }
+.f1-fill.mid  { background: var(--amber); }
+
+.class-table tr.worst td { background: rgba(224, 92, 92, 0.04); }
+.class-table tr:hover td { background: rgba(42, 53, 80, 0.5); }
+
+/* ─── Confusion Matrix ──────────────────────────────────────── */
+.confusion-wrap { overflow-x: auto; }
+
+.confusion {
+  border-collapse: collapse;
+  font-size: 11px;
+  width: 100%;
+}
+
+.confusion th {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 6px;
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--seam);
+}
+
+.confusion th.row-head {
+  text-align: right;
+  padding-right: 10px;
+  border-bottom: none;
+  border-right: 1px solid var(--seam);
+}
+
+.confusion td {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-align: center;
+  padding: 7px 8px;
+  border: 1px solid rgba(42, 53, 80, 0.4);
+  min-width: 40px;
+}
+
+.confusion td.row-label {
+  font-size: 9px;
+  text-align: right;
+  padding-right: 10px;
+  color: var(--muted);
+  border: none;
+  border-right: 1px solid var(--seam);
+  min-width: 90px;
+}
+
+.confusion td.diag {
+  color: var(--sky);
+  font-weight: 700;
+  background: var(--sky-dim);
+}
+
+.confusion td.err {
+  color: var(--danger);
+  font-weight: 600;
+  background: rgba(224, 92, 92, 0.06);
+}
+
+/* Axis labels */
+.confusion-outer { position: relative; }
+.axis-label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-align: right;
+  padding-right: 10px;
+}
+.axis-label-top {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-align: center;
+  padding-left: 90px;
+}
+
+/* ─── Taxonomy Coverage Chips ───────────────────────────────── */
+.coverage-group { margin-bottom: 14px; }
+.coverage-group:last-child { margin-bottom: 0; }
+
+.bucket-label {
+  font-family: var(--font-board);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 3px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.chip-good {
+  background: rgba(92, 184, 138, 0.12);
+  color: var(--good);
+  border-color: rgba(92, 184, 138, 0.3);
+}
+.chip-ok {
+  background: rgba(143, 180, 232, 0.1);
+  color: var(--sky);
+  border-color: rgba(143, 180, 232, 0.25);
+}
+.chip-bad {
+  background: rgba(224, 92, 92, 0.1);
+  color: var(--danger);
+  border-color: rgba(224, 92, 92, 0.3);
+}
+.chip-untested {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--seam);
+  border-style: dashed;
+  opacity: 0.8;
+}
+.chip-unsupported {
+  background: rgba(42, 53, 80, 0.4);
+  color: rgba(137, 150, 179, 0.5);
+  border-color: rgba(42, 53, 80, 0.7);
+}
+
+.chip-score {
+  font-weight: 600;
+}
+
+/* ─── MOCKUP Corner Label ───────────────────────────────────── */
+.mockup-label {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--seam);
+  border-radius: 3px;
+  padding: 5px 10px;
+  opacity: 0.85;
+  z-index: 999;
+}
+
+/* ─── Responsive overflow guard ─────────────────────────────── */
+.board-outer { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<header class="masthead">
+  <div class="masthead-brand">
+    <span class="brand-name">Artha Leaderboard</span>
+    <span class="brand-tag">predictions in → scored against ground truth → on the board</span>
+  </div>
+  <div class="masthead-controls">
+    <div class="toggle-group">
+      <button class="toggle-btn active">Best run</button>
+      <button class="toggle-btn">Latest run</button>
+    </div>
+    <button class="gear-btn" title="Settings">⚙</button>
+  </div>
+</header>
+
+<!-- TAB NAV -->
+<nav class="tab-nav">
+  <a class="tab" href="#">Home</a>
+  <a class="tab" href="#">Segmentation</a>
+  <a class="tab active" href="#">Classification</a>
+  <a class="tab" href="#">Extraction</a>
+  <a class="tab" href="#">Segregation</a>
+  <a class="tab" href="#">Taxonomy</a>
+</nav>
+
+<!-- CONTROL BAR -->
+<div class="control-bar">
+  <select class="dataset-select">
+    <option>V1 — 250 docs</option>
+  </select>
+  <span class="gt-chip">GT: 250 docs</span>
+  <div class="spacer"></div>
+  <button class="btn btn-ghost">+ Dataset</button>
+  <button class="btn btn-ghost">Upload GT</button>
+  <button class="btn btn-primary">+ Add run</button>
+  <button class="btn btn-ghost">Manual entry</button>
+</div>
+
+<!-- THE BOARD -->
+<div class="board-outer">
+  <div class="board-wrap">
+
+    <!-- Board Header Strip -->
+    <div class="board-header">
+      <div class="col-label" style="text-align:center;">#</div>
+      <div class="col-label">Model config</div>
+      <div class="col-label num">Accuracy</div>
+      <div class="col-label num">Macro F1</div>
+      <div class="col-label num">Out-of-scope</div>
+      <div class="col-label num">Checkpoint</div>
+      <div class="col-label num">Runs</div>
+      <div class="col-label num">When</div>
+    </div>
+
+    <div class="board">
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- RANK 1 — LEADER (expanded) -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="model-row leader open" id="row-1">
+        <div class="model-row-head" onclick="toggleModel('row-1')">
+          <div class="rank" style="text-align:center;"><span class="expand-arrow">▸</span></div>
+          <div class="model-name">
+            qwen3.5-9b-indic-doc
+            <span class="leader-tag">▲ LEADER</span>
+          </div>
+          <div class="flap-cell"><span class="flap-val">0.94</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">0.91</span></div>
+          <div class="flap-cell"><span class="flap-val secondary" style="min-width:56px;">3</span></div>
+          <div class="ckpt-val">step-4800</div>
+          <div class="runs-val">5</div>
+          <div class="when-val">2026-08-17 14:22</div>
+        </div>
+
+        <!-- Run list for qwen -->
+        <div class="run-list">
+
+          <div class="run-list-header">
+            <div></div>
+            <div class="run-col-label" style="text-align:left;">Checkpoint</div>
+            <div class="run-col-label">Accuracy</div>
+            <div class="run-col-label">Coverage</div>
+            <div class="run-col-label">When</div>
+            <div class="run-col-label"></div>
+          </div>
+
+          <!-- Run A — expanded -->
+          <div class="run-row open" id="run-1a" onclick="toggleRun('run-1a', 'drawer-1a')">
+            <div><span class="run-expand-arrow">▸</span></div>
+            <div class="run-ckpt">step-4800</div>
+            <div class="run-metric">0.94</div>
+            <div style="display:flex;align-items:center;"><span class="cov-badge cov-full">FULL</span></div>
+            <div class="run-when">2026-08-17 14:22</div>
+            <div></div>
+          </div>
+
+          <!-- ─── ANALYSIS DRAWER ─── -->
+          <div class="analysis-drawer" id="drawer-1a">
+
+            <!-- Boarding Pass Stub -->
+            <div class="boarding-pass">
+              <div class="bp-main">
+                <div class="bp-header">
+                  <span class="bp-run-id">RUN · cls-qwen-v5k4-r7mx2q</span>
+                  <span class="bp-run-id" style="color:var(--sky);">CLASSIFICATION</span>
+                </div>
+                <div class="bp-model">QWEN3.5-9B-INDIC-DOC</div>
+                <div class="bp-barcode" aria-hidden="true">||| || ||| | || |||| | |||| ||| | || |||| || ||| || ||| | || |||| | |||| |||</div>
+              </div>
+              <div class="bp-perforations" aria-hidden="true"></div>
+              <div class="bp-segments">
+                <div class="bp-seg">
+                  <span class="bp-seg-label">Dataset</span>
+                  <span class="bp-seg-val">V1</span>
+                </div>
+                <div class="bp-seg">
+                  <span class="bp-seg-label">Prompt</span>
+                  <span class="bp-seg-val">cls-v3</span>
+                </div>
+                <div class="bp-seg">
+                  <span class="bp-seg-label">Ckpt</span>
+                  <span class="bp-seg-val">step-4800</span>
+                </div>
+                <div class="bp-seg">
+                  <span class="bp-seg-label">Coverage</span>
+                  <span class="bp-seg-val" style="color:var(--sky);">FULL</span>
+                </div>
+                <div class="bp-seg">
+                  <span class="bp-seg-label">Scored</span>
+                  <span class="bp-seg-val">250</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats strip -->
+            <div class="stats-strip">
+              <div class="stat-block">
+                <span class="stat-label">Accuracy</span>
+                <span class="stat-val">0.94</span>
+              </div>
+              <div class="stat-block">
+                <span class="stat-label">Macro F1</span>
+                <span class="stat-val">0.91</span>
+              </div>
+              <div class="stat-block">
+                <span class="stat-label">Scored docs</span>
+                <span class="stat-val neutral">250</span>
+              </div>
+              <div class="stat-block">
+                <span class="stat-label">Out-of-scope</span>
+                <span class="stat-val neutral">3</span>
+              </div>
+              <button class="reagg-btn">↻ re-aggregate</button>
+            </div>
+
+            <!-- Analysis sections -->
+            <div class="analysis-sections">
+
+              <!-- LEFT: per-class table + confusion matrix -->
+              <div class="analysis-left">
+
+                <!-- Per-class table -->
+                <div>
+                  <div class="section-head">Per-class performance — worst first</div>
+                  <div style="overflow-x:auto;">
+                    <table class="class-table">
+                      <thead>
+                        <tr>
+                          <th>Class</th>
+                          <th>P</th>
+                          <th>R</th>
+                          <th>F1</th>
+                          <th>Support</th>
+                          <th style="min-width:80px;"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr class="worst">
+                          <td><span class="class-code">bank_statement</span></td>
+                          <td>0.72</td>
+                          <td>0.65</td>
+                          <td>0.68</td>
+                          <td>22</td>
+                          <td>
+                            <div class="f1-bar-wrap">
+                              <div class="f1-bar"><div class="f1-fill bad" style="width:68%;"></div></div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="class-code">form_16</span></td>
+                          <td>0.78</td>
+                          <td>0.70</td>
+                          <td>0.74</td>
+                          <td>14</td>
+                          <td>
+                            <div class="f1-bar-wrap">
+                              <div class="f1-bar"><div class="f1-fill mid" style="width:74%;"></div></div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="class-code">rent_agreement</span></td>
+                          <td>0.83</td>
+                          <td>0.88</td>
+                          <td>0.85</td>
+                          <td>31</td>
+                          <td>
+                            <div class="f1-bar-wrap">
+                              <div class="f1-bar"><div class="f1-fill" style="width:85%;"></div></div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="class-code">aadhaar_front</span></td>
+                          <td>0.97</td>
+                          <td>0.99</td>
+                          <td>0.98</td>
+                          <td>40</td>
+                          <td>
+                            <div class="f1-bar-wrap">
+                              <div class="f1-bar"><div class="f1-fill" style="width:98%;"></div></div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="class-code">pan_card</span></td>
+                          <td>0.99</td>
+                          <td>0.98</td>
+                          <td>0.98</td>
+                          <td>38</td>
+                          <td>
+                            <div class="f1-bar-wrap">
+                              <div class="f1-bar"><div class="f1-fill" style="width:98%;"></div></div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Confusion matrix -->
+                <div>
+                  <div class="section-head">Confusion matrix</div>
+                  <div class="axis-label-top">← predicted →</div>
+                  <div class="confusion-outer">
+                    <div style="display:flex;align-items:flex-start;gap:4px;">
+                      <div style="display:flex;align-items:center;writing-mode:vertical-rl;transform:rotate(180deg);padding-bottom:8px;">
+                        <span class="axis-label" style="writing-mode:vertical-rl;transform:rotate(180deg);margin:0;padding:0;letter-spacing:0.1em;font-size:9px;font-family:var(--font-ui);font-weight:600;text-transform:uppercase;color:var(--muted);">← actual →</span>
+                      </div>
+                      <div class="confusion-wrap">
+                        <table class="confusion">
+                          <thead>
+                            <tr>
+                              <th class="row-head"></th>
+                              <th>bank_stmt</th>
+                              <th>form_16</th>
+                              <th>rent_agr</th>
+                              <th>aadhaar</th>
+                              <th>pan_card</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td class="row-label">bank_statement</td>
+                              <td class="diag">14</td>
+                              <td class="err">4</td>
+                              <td>2</td>
+                              <td>1</td>
+                              <td>1</td>
+                            </tr>
+                            <tr>
+                              <td class="row-label">form_16</td>
+                              <td class="err">3</td>
+                              <td class="diag">10</td>
+                              <td>1</td>
+                              <td>0</td>
+                              <td>0</td>
+                            </tr>
+                            <tr>
+                              <td class="row-label">rent_agreement</td>
+                              <td>1</td>
+                              <td>2</td>
+                              <td class="diag">27</td>
+                              <td>1</td>
+                              <td>0</td>
+                            </tr>
+                            <tr>
+                              <td class="row-label">aadhaar_front</td>
+                              <td>0</td>
+                              <td>0</td>
+                              <td>1</td>
+                              <td class="diag">40</td>
+                              <td>0</td>
+                            </tr>
+                            <tr>
+                              <td class="row-label">pan_card</td>
+                              <td>0</td>
+                              <td>0</td>
+                              <td>0</td>
+                              <td>1</td>
+                              <td class="diag">37</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div><!-- /analysis-left -->
+
+              <!-- RIGHT: taxonomy coverage chips -->
+              <div class="analysis-right">
+                <div>
+                  <div class="section-head">Taxonomy coverage</div>
+
+                  <div class="coverage-group">
+                    <div class="bucket-label">KYC</div>
+                    <div class="chip-row">
+                      <span class="chip chip-good"><span>aadhaar_front</span><span class="chip-score">0.98</span></span>
+                      <span class="chip chip-good"><span>pan_card</span><span class="chip-score">0.98</span></span>
+                      <span class="chip chip-ok"><span>aadhaar_back</span><span class="chip-score">0.87</span></span>
+                      <span class="chip chip-ok"><span>passport_front</span><span class="chip-score">0.84</span></span>
+                      <span class="chip chip-untested"><span>voter_id</span><span class="chip-score">—</span></span>
+                      <span class="chip chip-unsupported"><span>driving_lic</span><span class="chip-score">–</span></span>
+                    </div>
+                  </div>
+
+                  <div class="coverage-group">
+                    <div class="bucket-label">Financial</div>
+                    <div class="chip-row">
+                      <span class="chip chip-bad"><span>bank_statement</span><span class="chip-score">0.68</span></span>
+                      <span class="chip chip-bad"><span>form_16</span><span class="chip-score">0.74</span></span>
+                      <span class="chip chip-ok"><span>itr_v</span><span class="chip-score">0.81</span></span>
+                      <span class="chip chip-ok"><span>salary_slip</span><span class="chip-score">0.85</span></span>
+                      <span class="chip chip-untested"><span>ca_certificate</span><span class="chip-score">—</span></span>
+                    </div>
+                  </div>
+
+                  <div class="coverage-group">
+                    <div class="bucket-label">Property</div>
+                    <div class="chip-row">
+                      <span class="chip chip-ok"><span>rent_agreement</span><span class="chip-score">0.85</span></span>
+                      <span class="chip chip-ok"><span>sale_deed</span><span class="chip-score">0.80</span></span>
+                      <span class="chip chip-untested"><span>property_card</span><span class="chip-score">—</span></span>
+                      <span class="chip chip-unsupported"><span>noc_letter</span><span class="chip-score">–</span></span>
+                    </div>
+                  </div>
+
+                </div>
+              </div><!-- /analysis-right -->
+
+            </div><!-- /analysis-sections -->
+
+          </div><!-- /drawer-1a -->
+
+          <!-- Run B — partial coverage -->
+          <div class="run-row partial" id="run-1b" onclick="toggleRun('run-1b', 'drawer-1b')">
+            <div><span class="run-expand-arrow">▸</span></div>
+            <div class="run-ckpt">step-4200</div>
+            <div class="run-metric">0.93</div>
+            <div style="display:flex;align-items:center;"><span class="cov-badge cov-partial">PARTIAL −7</span></div>
+            <div class="run-when">2026-08-16 22:05</div>
+            <div></div>
+          </div>
+          <div class="analysis-drawer" id="drawer-1b"></div>
+
+          <!-- Run C — manual -->
+          <div class="run-row" id="run-1c" onclick="toggleRun('run-1c', 'drawer-1c')">
+            <div><span class="run-expand-arrow">▸</span></div>
+            <div class="run-ckpt">step-3800</div>
+            <div class="run-metric">0.91</div>
+            <div style="display:flex;align-items:center;"><span class="cov-badge cov-manual">MANUAL</span></div>
+            <div class="run-when">2026-08-16 18:44</div>
+            <div></div>
+          </div>
+          <div class="analysis-drawer" id="drawer-1c"></div>
+
+        </div><!-- /run-list -->
+      </div><!-- /rank-1 -->
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- RANK 2 -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="model-row" id="row-2">
+        <div class="model-row-head" onclick="toggleModel('row-2')">
+          <div class="rank" style="text-align:center;color:var(--muted);font-family:var(--font-board);font-size:13px;">2 <span class="expand-arrow">▸</span></div>
+          <div class="model-name">gemma-3-12b-doc</div>
+          <div class="flap-cell"><span class="flap-val">0.92</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">0.88</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">5</span></div>
+          <div class="ckpt-val">step-3600</div>
+          <div class="runs-val">4</div>
+          <div class="when-val">2026-08-17 09:10</div>
+        </div>
+        <div class="run-list"></div>
+      </div>
+
+      <!-- RANK 3 -->
+      <div class="model-row" id="row-3">
+        <div class="model-row-head" onclick="toggleModel('row-3')">
+          <div class="rank" style="text-align:center;color:var(--muted);font-family:var(--font-board);font-size:13px;">3 <span class="expand-arrow">▸</span></div>
+          <div class="model-name">internvl2-8b-kyc</div>
+          <div class="flap-cell"><span class="flap-val">0.89</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">0.84</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">8</span></div>
+          <div class="ckpt-val">step-2200</div>
+          <div class="runs-val">3</div>
+          <div class="when-val">2026-08-16 20:41</div>
+        </div>
+        <div class="run-list"></div>
+      </div>
+
+      <!-- RANK 4 -->
+      <div class="model-row" id="row-4">
+        <div class="model-row-head" onclick="toggleModel('row-4')">
+          <div class="rank" style="text-align:center;color:var(--muted);font-family:var(--font-board);font-size:13px;">4 <span class="expand-arrow">▸</span></div>
+          <div class="model-name">pixtral-12b-base</div>
+          <div class="flap-cell"><span class="flap-val">0.85</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">0.79</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">12</span></div>
+          <div class="ckpt-val">v0-cold</div>
+          <div class="runs-val">2</div>
+          <div class="when-val">2026-08-16 11:03</div>
+        </div>
+        <div class="run-list"></div>
+      </div>
+
+      <!-- RANK 5 -->
+      <div class="model-row" id="row-5">
+        <div class="model-row-head" onclick="toggleModel('row-5')">
+          <div class="rank" style="text-align:center;color:var(--muted);font-family:var(--font-board);font-size:13px;">5 <span class="expand-arrow">▸</span></div>
+          <div class="model-name">docowl-1.5-7b</div>
+          <div class="flap-cell"><span class="flap-val">0.81</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">0.74</span></div>
+          <div class="flap-cell"><span class="flap-val secondary">15</span></div>
+          <div class="ckpt-val">step-900</div>
+          <div class="runs-val">1</div>
+          <div class="when-val">2026-08-15 18:30</div>
+        </div>
+        <div class="run-list"></div>
+      </div>
+
+    </div><!-- /board -->
+  </div><!-- /board-wrap -->
+</div><!-- /board-outer -->
+
+<!-- MOCKUP LABEL -->
+<div class="mockup-label">MOCKUP · synthetic data</div>
+
+<script>
+function toggleModel(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.classList.toggle('open');
+}
+
+function toggleRun(runId, drawerId) {
+  const runRow = document.getElementById(runId);
+  const drawer = document.getElementById(drawerId);
+  if (!runRow || !drawer) return;
+
+  // Close siblings
+  const allRunRows = runRow.closest('.run-list').querySelectorAll('.run-row');
+  allRunRows.forEach(r => {
+    if (r !== runRow) {
+      r.classList.remove('open');
+      // close their drawer
+      const sibDrawer = r.nextElementSibling;
+      if (sibDrawer && sibDrawer.classList.contains('analysis-drawer')) {
+        sibDrawer.style.display = 'none';
+      }
+    }
+  });
+
+  const isOpen = runRow.classList.contains('open');
+  if (isOpen) {
+    runRow.classList.remove('open');
+    drawer.style.display = 'none';
+  } else {
+    runRow.classList.add('open');
+    drawer.style.display = 'block';
+  }
+}
+
+// On page load, show drawer-1a (it's already in open state)
+document.addEventListener('DOMContentLoaded', function() {
+  const d = document.getElementById('drawer-1a');
+  if (d) d.style.display = 'block';
+});
+</script>
+
+</body>
+</html>

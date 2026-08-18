@@ -9,6 +9,13 @@ One place to answer *"which model config wins, on which task, on which dataset."
 - Companion docs in this repo: **`PLAN.md`** (design + phasing), **`SCHEMAS.md`** (file contracts).
   This file is the authoritative status + architecture + decisions doc — start here.
 
+## Working style (token efficiency)
+- **Hand small/mechanical tasks to subagents, and run those subagents on Sonnet, not Opus.**
+  Reserve Opus for work that needs the main-thread context or hard judgment. Anything scoped and
+  self-contained (a doc edit, a focused search, generating a mockup from a spec, a rote refactor)
+  goes to a Sonnet subagent — spawn with `Agent(..., model: "sonnet")`. Parallelize independent
+  ones. Goal: don't burn Opus tokens on things a cheaper model does just as well.
+
 ---
 
 ## 1. Status at a glance
